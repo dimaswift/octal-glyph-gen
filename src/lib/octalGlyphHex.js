@@ -48,12 +48,14 @@ function render(value, options = {}) {
   })
 
   const multiPolygon = polygons.length > 0 ? union(polygons[0], ...polygons.slice(1)) : []
-  const bounds = getMultiPolygonBounds(multiPolygon) ?? DEFAULT_BOUNDS
   const precision = numberOr(options.precision, font.renderer.precision)
-  const padding = numberOr(options.padding, font.renderer.padding)
+  const paddingGridSize = numberOr(options.gridSize, font.renderer.gridSize)
+  const paddingCells = numberOr(options.paddingCells, font.renderer.paddingCells)
+  const padding = numberOr(options.padding, paddingGridSize * paddingCells)
+  const bounds = getStackedGlyphFrameBounds(font, chunks.length, padding, paddingGridSize)
   const fill = stringOr(options.fill, font.renderer.fill)
   const path = multiPolygonToPath(multiPolygon, precision)
-  const viewBox = boundsToViewBox(bounds, padding, precision)
+  const viewBox = boundsToViewBox(bounds, 0, precision)
   const svg = renderSvgString(path, viewBox, {
     ...options,
     fill,
@@ -122,7 +124,12 @@ function normalizeFont(rawInput = {}) {
     },
     renderer: {
       fill: stringOr(rawRenderer.fill, stringOr(fallbackRenderer.fill, '#000000')),
-      padding: numberOr(rawRenderer.padding, numberOr(fallbackRenderer.padding, 18)),
+      gridSize: numberOr(rawRenderer.gridSize, numberOr(fallbackRenderer.gridSize, 8)),
+      paddingCells: numberOr(
+        rawRenderer.paddingCells,
+        numberOr(rawRenderer.padding, numberOr(fallbackRenderer.padding, 16)) /
+          numberOr(rawRenderer.gridSize, numberOr(fallbackRenderer.gridSize, 8)),
+      ),
       precision: numberOr(rawRenderer.precision, numberOr(fallbackRenderer.precision, 2)),
     },
     arms: {},
@@ -228,14 +235,64 @@ function multiPolygonToPath(multiPolygon, precision = 2) {
     .join(' ')
 }
 
-function getMultiPolygonBounds(multiPolygon) {
-  const points = multiPolygon.flat(2)
+function getStackedGlyphFrameBounds(font, chunkCount, padding, gridSize) {
+  const frame = getGlyphFrameBounds(font, padding, gridSize)
+  const stackHeight = Math.max(0, chunkCount - 1) * font.core.glyphSpacing
+
+  return {
+    minX: frame.minX,
+    minY: frame.minY,
+    maxX: frame.maxX,
+    maxY: frame.maxY + stackHeight,
+    width: frame.width,
+    height: frame.height + stackHeight,
+  }
+}
+
+function getGlyphFrameBounds(font, padding, gridSize) {
+  const origin = font.core.origin
+  const points = [
+    ...font.core.polygon,
+    ...font.core.holes.flat(),
+    font.core.socketStart,
+    font.core.socketEnd,
+  ]
+
+  for (let socketIndex = 0; socketIndex < font.core.digitsPerGlyph; socketIndex += 1) {
+    const rotation = socketIndex * font.core.rotationStepDeg
+    DIGIT_KEYS.forEach((digit) => {
+      alignArmEndpoints(font, font.arms[digit] ?? []).forEach((point) => {
+        points.push(rotatePoint(point, rotation, origin))
+      })
+    })
+  }
+
+  const rawBounds = getPointBounds(points) ?? DEFAULT_BOUNDS
+  const safeGridSize = Math.max(0.0001, gridSize)
+  const halfWidth = round(Math.max(safeGridSize, Math.ceil(maxDistanceFromOrigin(rawBounds, origin, 'x') / safeGridSize) * safeGridSize + padding))
+  const halfHeight = round(Math.max(safeGridSize, Math.ceil(maxDistanceFromOrigin(rawBounds, origin, 'y') / safeGridSize) * safeGridSize + padding))
+
+  return {
+    minX: origin.x - halfWidth,
+    minY: origin.y - halfHeight,
+    maxX: origin.x + halfWidth,
+    maxY: origin.y + halfHeight,
+    width: halfWidth * 2,
+    height: halfHeight * 2,
+  }
+}
+
+function getPointBounds(points) {
   if (points.length === 0) {
     return null
   }
 
-  const xs = points.map((point) => point[0])
-  const ys = points.map((point) => point[1])
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  return buildBounds(xs, ys)
+}
+
+function buildBounds(xs, ys) {
   const minX = Math.min(...xs)
   const minY = Math.min(...ys)
   const maxX = Math.max(...xs)
@@ -249,6 +306,14 @@ function getMultiPolygonBounds(multiPolygon) {
     width: maxX - minX,
     height: maxY - minY,
   }
+}
+
+function maxDistanceFromOrigin(bounds, origin, axis) {
+  if (axis === 'x') {
+    return Math.max(Math.abs(bounds.minX - origin.x), Math.abs(bounds.maxX - origin.x))
+  }
+
+  return Math.max(Math.abs(bounds.minY - origin.y), Math.abs(bounds.maxY - origin.y))
 }
 
 function boundsToViewBox(bounds, padding, precision) {
@@ -333,21 +398,14 @@ async function readFontText(source) {
 
 async function readNodeFile(path) {
   try {
-    const req =
-      typeof module !== 'undefined' && module.require
-        ? module.require.bind(module)
-        : typeof require !== 'undefined'
-          ? require
-          : null
-
-    if (!req) {
+    if (typeof document !== 'undefined') {
       return null
     }
 
-    const fs = req('fs/promises')
+    const fs = await import('node:fs/promises')
     return fs.readFile(path, 'utf8')
   } catch (error) {
-    if (error && error.code === 'MODULE_NOT_FOUND') {
+    if (error && (error.code === 'MODULE_NOT_FOUND' || error.code === 'ERR_MODULE_NOT_FOUND')) {
       return null
     }
     throw error

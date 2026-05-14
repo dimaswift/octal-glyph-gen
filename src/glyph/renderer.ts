@@ -104,6 +104,14 @@ export function normalizeFont(rawInput: Partial<GlyphFont> | null | undefined = 
   const rawCore: Record<string, unknown> = isRecord(raw.core) ? raw.core : {}
   const rawArms: Record<string, unknown> = isRecord(raw.arms) ? raw.arms : {}
   const rawRenderer: Record<string, unknown> = isRecord(raw.renderer) ? raw.renderer : {}
+  const rendererGridSize = isFiniteNumber(rawRenderer.gridSize)
+    ? rawRenderer.gridSize
+    : DEFAULT_FONT.renderer.gridSize
+  const rendererPaddingCells = isFiniteNumber(rawRenderer.paddingCells)
+    ? rawRenderer.paddingCells
+    : isFiniteNumber(rawRenderer.padding)
+      ? rawRenderer.padding / rendererGridSize
+      : DEFAULT_FONT.renderer.paddingCells
   const merged: GlyphFont = {
     version: 'octal-glyph-font/v1',
     name: typeof raw.name === 'string' ? raw.name : DEFAULT_FONT.name,
@@ -125,10 +133,9 @@ export function normalizeFont(rawInput: Partial<GlyphFont> | null | undefined = 
       glyphSpacing: isFiniteNumber(rawCore.glyphSpacing) ? rawCore.glyphSpacing : DEFAULT_FONT.core.glyphSpacing,
     },
     renderer: {
-      ...DEFAULT_FONT.renderer,
-      ...rawRenderer,
       fill: typeof rawRenderer.fill === 'string' ? rawRenderer.fill : DEFAULT_FONT.renderer.fill,
-      padding: isFiniteNumber(rawRenderer.padding) ? rawRenderer.padding : DEFAULT_FONT.renderer.padding,
+      gridSize: rendererGridSize,
+      paddingCells: rendererPaddingCells,
       precision: isFiniteNumber(rawRenderer.precision) ? rawRenderer.precision : DEFAULT_FONT.renderer.precision,
     },
     arms: { ...DEFAULT_FONT.arms },
@@ -174,10 +181,10 @@ export function buildGlyphRender(fontInput: GlyphFont, value: string): GlyphRend
   })
 
   const multiPolygon = polygons.length > 0 ? union(polygons[0], ...polygons.slice(1)) : []
-  const bounds = getMultiPolygonBounds(multiPolygon) ?? DEFAULT_BOUNDS
+  const bounds = getStackedGlyphFrameBounds(font, chunks.length)
   const precision = font.renderer.precision
   const path = multiPolygonToPath(multiPolygon, precision)
-  const viewBox = boundsToViewBox(bounds, font.renderer.padding, precision)
+  const viewBox = boundsToViewBox(bounds, 0, precision)
   const svg = renderSvg(path, viewBox, font.renderer.fill)
 
   return {
@@ -188,6 +195,46 @@ export function buildGlyphRender(fontInput: GlyphFont, value: string): GlyphRend
     viewBox,
     bounds,
     multiPolygon,
+  }
+}
+
+export function getRenderPadding(fontInput: GlyphFont) {
+  const font = normalizeFont(fontInput)
+  return font.renderer.gridSize * font.renderer.paddingCells
+}
+
+export function getGlyphFrameBounds(fontInput: GlyphFont): Bounds {
+  const font = normalizeFont(fontInput)
+  const origin = font.core.origin
+  const points: Point[] = [
+    ...font.core.polygon,
+    ...font.core.holes.flat(),
+    font.core.socketStart,
+    font.core.socketEnd,
+  ]
+
+  for (let socketIndex = 0; socketIndex < font.core.digitsPerGlyph; socketIndex += 1) {
+    const rotation = socketIndex * font.core.rotationStepDeg
+    DIGIT_KEYS.forEach((digit) => {
+      alignArmEndpoints(font, font.arms[digit] ?? []).forEach((point) => {
+        points.push(rotatePoint(point, rotation, origin))
+      })
+    })
+  }
+
+  const rawBounds = getPointBounds(points) ?? DEFAULT_BOUNDS
+  const gridSize = Math.max(0.0001, font.renderer.gridSize)
+  const padding = getRenderPadding(font)
+  const halfWidth = round(Math.max(gridSize, Math.ceil(maxDistanceFromOrigin(rawBounds, origin, 'x') / gridSize) * gridSize + padding))
+  const halfHeight = round(Math.max(gridSize, Math.ceil(maxDistanceFromOrigin(rawBounds, origin, 'y') / gridSize) * gridSize + padding))
+
+  return {
+    minX: origin.x - halfWidth,
+    minY: origin.y - halfHeight,
+    maxX: origin.x + halfWidth,
+    maxY: origin.y + halfHeight,
+    width: halfWidth * 2,
+    height: halfHeight * 2,
   }
 }
 
@@ -211,13 +258,44 @@ export function multiPolygonToPath(multiPolygon: MultiPolygon, precision = 2) {
 }
 
 export function getMultiPolygonBounds(multiPolygon: MultiPolygon): Bounds | null {
-  const points = multiPolygon.flat(2)
+  return getTuplePointBounds(multiPolygon.flat(2))
+}
+
+function getStackedGlyphFrameBounds(font: GlyphFont, chunkCount: number): Bounds {
+  const frame = getGlyphFrameBounds(font)
+  const stackHeight = Math.max(0, chunkCount - 1) * font.core.glyphSpacing
+
+  return {
+    minX: frame.minX,
+    minY: frame.minY,
+    maxX: frame.maxX,
+    maxY: frame.maxY + stackHeight,
+    width: frame.width,
+    height: frame.height + stackHeight,
+  }
+}
+
+function getPointBounds(points: Point[]): Bounds | null {
+  if (points.length === 0) {
+    return null
+  }
+
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+  return buildBounds(xs, ys)
+}
+
+function getTuplePointBounds(points: number[][]): Bounds | null {
   if (points.length === 0) {
     return null
   }
 
   const xs = points.map((point) => point[0])
   const ys = points.map((point) => point[1])
+  return buildBounds(xs, ys)
+}
+
+function buildBounds(xs: number[], ys: number[]): Bounds {
   const minX = Math.min(...xs)
   const minY = Math.min(...ys)
   const maxX = Math.max(...xs)
@@ -231,6 +309,14 @@ export function getMultiPolygonBounds(multiPolygon: MultiPolygon): Bounds | null
     width: maxX - minX,
     height: maxY - minY,
   }
+}
+
+function maxDistanceFromOrigin(bounds: Bounds, origin: Point, axis: 'x' | 'y') {
+  if (axis === 'x') {
+    return Math.max(Math.abs(bounds.minX - origin.x), Math.abs(bounds.maxX - origin.x))
+  }
+
+  return Math.max(Math.abs(bounds.minY - origin.y), Math.abs(bounds.maxY - origin.y))
 }
 
 function pointListToRing(points: Point[]): Ring {

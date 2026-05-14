@@ -1,0 +1,1 @@
+rsync -avz --delete "dist/" root@fractonica.com:/var/www/fractonica.com/html/octal-glyph-studio

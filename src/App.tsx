@@ -1,20 +1,29 @@
 import {
   Braces,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Diamond,
   Download,
   FileUp,
   Grid3X3,
+  Maximize2,
+  Moon,
   PencilRuler,
   Plus,
   RotateCcw,
+  Shuffle,
+  Sun,
   Trash2,
+  X,
 } from 'lucide-react'
 import {
   type ChangeEvent,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -24,6 +33,7 @@ import { DEFAULT_ARMS, DEFAULT_CORE_HOLE, DEFAULT_FONT, cloneDefaultFont } from 
 import {
   alignArmEndpoints,
   buildGlyphRender,
+  getRenderPadding,
   hasInvalidOctalDigits,
   normalizeFont,
   pointsToSvg,
@@ -35,8 +45,10 @@ import { DIGIT_KEYS, type DigitKey, type GlyphFont, type Point } from './glyph/t
 type EditorMode = 'arms' | 'core'
 type CoreLayer = 'outer' | 'hole'
 type GridMode = 'square' | 'diagonal' | 'triangular'
-type OutputMode = 'preview' | 'table'
+type OutputMode = 'preview' | 'atlas'
 type SocketEndpoint = 'start' | 'end'
+type AtlasOrder = 'ordered' | 'shuffled'
+type Theme = 'light' | 'dark'
 
 type DragTarget =
   | { kind: 'arm'; index: number }
@@ -44,6 +56,8 @@ type DragTarget =
   | { kind: 'socket'; endpoint: SocketEndpoint }
 
 const VIEWBOX_EXTENT = 180
+const ATLAS_GAP = 8
+const DEFAULT_ATLAS_CELL_SIZE = 112
 
 function App() {
   const [font, setFont] = useState<GlyphFont>(() => cloneDefaultFont())
@@ -53,16 +67,46 @@ function App() {
   const [selectedCoreLayer, setSelectedCoreLayer] = useState<CoreLayer>('outer')
   const [selectedCorePoint, setSelectedCorePoint] = useState(0)
   const [selectedSocket, setSelectedSocket] = useState<SocketEndpoint>('start')
-  const [gridSize, setGridSize] = useState(8)
+  const [gridSize, setGridSize] = useState(DEFAULT_FONT.renderer.gridSize)
   const [gridMode, setGridMode] = useState<GridMode>('square')
   const [snapToGrid, setSnapToGrid] = useState(true)
   const [octalInput, setOctalInput] = useState('1120')
+  const [decimalInput, setDecimalInput] = useState(() => octalToDecimalString('1120'))
   const [outputMode, setOutputMode] = useState<OutputMode>('preview')
+  const [isAtlasOpen, setIsAtlasOpen] = useState(false)
+  const [atlasOrder, setAtlasOrder] = useState<AtlasOrder>('ordered')
+  const [atlasSeed, setAtlasSeed] = useState(1)
+  const [atlasPage, setAtlasPage] = useState(0n)
+  const [atlasCellSize, setAtlasCellSize] = useState(DEFAULT_ATLAS_CELL_SIZE)
+  const [showAtlasLabels, setShowAtlasLabels] = useState(true)
+  const [theme, setTheme] = useState<Theme>('light')
+  const [viewport, setViewport] = useState(getInitialViewport)
   const [status, setStatus] = useState('Ready')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const renderResult = useMemo(() => buildGlyphRender(font, octalInput), [font, octalInput])
-  const multiplicationTable = useMemo(() => buildMultiplicationTable(font), [font])
+  const renderPadding = useMemo(() => getRenderPadding(font), [font])
+  const atlasLayout = useMemo(() => calculateAtlasLayout(viewport, atlasCellSize), [atlasCellSize, viewport])
+  const atlasPageSize = BigInt(atlasLayout.pageSize)
+  const atlasTotalCount = useMemo(() => 8n ** BigInt(font.core.digitsPerGlyph), [font.core.digitsPerGlyph])
+  const atlasPageCount = useMemo(
+    () => (atlasTotalCount + atlasPageSize - 1n) / atlasPageSize,
+    [atlasPageSize, atlasTotalCount],
+  )
+  const currentAtlasPage = useMemo(() => clampAtlasPage(atlasPage, atlasPageCount), [atlasPage, atlasPageCount])
+  const atlasActive = outputMode === 'atlas' || isAtlasOpen
+  const atlasPageSummary = useMemo(
+    () =>
+      atlasActive
+        ? buildAtlasPage(font, currentAtlasPage, atlasTotalCount, atlasLayout.pageSize, atlasOrder === 'shuffled', atlasSeed)
+        : {
+            cells: [],
+            startSlot: currentAtlasPage * atlasPageSize,
+            endSlot: currentAtlasPage * atlasPageSize,
+            cellCount: 0,
+          },
+    [atlasActive, atlasLayout.pageSize, atlasOrder, atlasPageSize, atlasSeed, atlasTotalCount, currentAtlasPage, font],
+  )
   const exportJson = useMemo(() => JSON.stringify(font, null, 2), [font])
   const activeArm = alignArmEndpoints(font, font.arms[selectedDigit])
   const activeArmPoint = activeArm[selectedArmPoint] ?? activeArm[0]
@@ -71,6 +115,33 @@ function App() {
   const activeCorePoint = activeCorePoints[selectedCorePoint] ?? activeCorePoints[0]
   const invalidInput = hasInvalidOctalDigits(octalInput)
   const cleanInput = sanitizeOctalInput(octalInput) || '0'
+
+  useEffect(() => {
+    const handleResize = () => setViewport(getInitialViewport())
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    if (!isAtlasOpen) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsAtlasOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isAtlasOpen])
 
   function updateFont(mutator: (draft: GlyphFont) => void) {
     setFont((current) => {
@@ -109,6 +180,17 @@ function App() {
         draft.core.socketEnd = point
       }
     })
+  }
+
+  function handleOctalInputChange(value: string) {
+    setOctalInput(value)
+    setDecimalInput(octalToDecimalString(value))
+  }
+
+  function handleDecimalInputChange(value: string) {
+    const cleanDecimal = sanitizeDecimalInput(value)
+    setDecimalInput(cleanDecimal)
+    setOctalInput(cleanDecimal === '' ? '' : BigInt(cleanDecimal).toString(8))
   }
 
   function addArmPoint() {
@@ -187,6 +269,9 @@ function App() {
 
   function resetFont() {
     setFont(cloneDefaultFont())
+    setGridSize(DEFAULT_FONT.renderer.gridSize)
+    setAtlasOrder('ordered')
+    setAtlasPage(0n)
     setSelectedDigit('2')
     setSelectedArmPoint(1)
     setSelectedCoreLayer('outer')
@@ -198,6 +283,27 @@ function App() {
   async function copyText(value: string, label: string) {
     await navigator.clipboard.writeText(value)
     setStatus(`${label} copied`)
+  }
+
+  function setAtlasPageState(nextPage: bigint) {
+    const clamped = clampAtlasPage(nextPage, atlasPageCount)
+    setAtlasPage(clamped)
+  }
+
+  function applyAtlasPageInput(value: string) {
+    const pageNumber = parsePositiveInteger(value)
+    setAtlasPageState(pageNumber === null ? 0n : pageNumber - 1n)
+  }
+
+  function openAtlas(order: AtlasOrder = atlasOrder) {
+    setAtlasOrder(order)
+    setOutputMode('atlas')
+    setIsAtlasOpen(true)
+  }
+
+  function activateShuffle() {
+    setAtlasOrder('shuffled')
+    setAtlasSeed((seed) => seed + 1)
   }
 
   function downloadText(value: string, filename: string, type: string) {
@@ -219,7 +325,11 @@ function App() {
 
     try {
       const parsed = JSON.parse(await file.text()) as Partial<GlyphFont>
-      setFont(normalizeFont(parsed))
+      const nextFont = normalizeFont(parsed)
+      setFont(nextFont)
+      setGridSize(nextFont.renderer.gridSize)
+      setAtlasOrder('ordered')
+      setAtlasPage(0n)
       setStatus(`${file.name} imported`)
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Import failed')
@@ -229,7 +339,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell theme-${theme}`}>
       <header className="topbar">
         <div className="brand-lockup">
           <span className="brand-mark" aria-hidden="true">
@@ -242,13 +352,22 @@ function App() {
         </div>
 
         <div className="topbar-actions">
-          <label className="octal-field">
+          <label className="number-field">
             <span>Octal</span>
             <input
               value={octalInput}
-              onChange={(event) => setOctalInput(event.target.value)}
+              onChange={(event) => handleOctalInputChange(event.target.value)}
               spellCheck={false}
               aria-invalid={invalidInput}
+            />
+          </label>
+          <label className="number-field">
+            <span>Decimal</span>
+            <input
+              value={decimalInput}
+              onChange={(event) => handleDecimalInputChange(event.target.value)}
+              inputMode="numeric"
+              spellCheck={false}
             />
           </label>
           <button type="button" onClick={() => fileInputRef.current?.click()}>
@@ -261,6 +380,15 @@ function App() {
           >
             <Download size={16} />
             JSON
+          </button>
+          <button
+            type="button"
+            className="icon-button theme-toggle"
+            title={theme === 'light' ? 'Dark theme' : 'Light theme'}
+            aria-label={theme === 'light' ? 'Dark theme' : 'Light theme'}
+            onClick={() => setTheme((current) => (current === 'light' ? 'dark' : 'light'))}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
           </button>
           <input ref={fileInputRef} className="hidden-input" type="file" accept=".json" onChange={importJson} />
         </div>
@@ -417,7 +545,7 @@ function App() {
             <label>
               <span>
                 <Grid3X3 size={14} />
-                Grid
+                Snap grid
               </span>
               <input
                 type="number"
@@ -527,16 +655,19 @@ function App() {
             <button
               type="button"
               className={outputMode === 'preview' ? 'active' : ''}
-              onClick={() => setOutputMode('preview')}
+              onClick={() => {
+                setOutputMode('preview')
+                setIsAtlasOpen(false)
+              }}
             >
               Preview
             </button>
             <button
               type="button"
-              className={outputMode === 'table' ? 'active' : ''}
-              onClick={() => setOutputMode('table')}
+              className={outputMode === 'atlas' ? 'active' : ''}
+              onClick={() => openAtlas()}
             >
-              Table
+              Atlas
             </button>
           </div>
 
@@ -553,10 +684,29 @@ function App() {
                   {invalidInput ? 'Invalid digits ignored' : 'Octal input valid'}
                 </span>
                 <span>{renderResult.chunks.length} glyph layer{renderResult.chunks.length === 1 ? '' : 's'}</span>
+                <span>{font.renderer.paddingCells} pad cells</span>
               </div>
             </>
           ) : (
-            <MultiplicationTable font={font} cells={multiplicationTable} />
+            <AtlasSummary
+              atlasOrder={atlasOrder}
+              atlasCellSize={atlasCellSize}
+              atlasLayout={atlasLayout}
+              atlasPage={currentAtlasPage}
+              atlasPageCount={atlasPageCount}
+              digitsPerGlyph={font.core.digitsPerGlyph}
+              pageSummary={atlasPageSummary}
+              renderPadding={renderPadding}
+              showLabels={showAtlasLabels}
+              totalCount={atlasTotalCount}
+              onAtlasCellSizeChange={setAtlasCellSize}
+              onLabelsChange={setShowAtlasLabels}
+              onOpen={() => setIsAtlasOpen(true)}
+              onNext={() => setAtlasPageState(currentAtlasPage + 1n)}
+              onPrevious={() => setAtlasPageState(currentAtlasPage - 1n)}
+              onOrdered={() => setAtlasOrder('ordered')}
+              onShuffle={activateShuffle}
+            />
           )}
 
           <div className="settings-block">
@@ -573,18 +723,34 @@ function App() {
               />
             </label>
             <label>
-              <span>Padding</span>
+              <span>Pad grid</span>
               <input
                 type="number"
-                min={0}
-                value={font.renderer.padding}
+                min={1}
+                max={64}
+                value={font.renderer.gridSize}
                 onChange={(event) =>
                   updateFont((draft) => {
-                    draft.renderer.padding = Number(event.target.value)
+                    draft.renderer.gridSize = clampNumber(Number(event.target.value), 1, 64)
                   })
                 }
               />
             </label>
+            <label>
+              <span>Pad cells</span>
+              <input
+                type="number"
+                min={0}
+                step={0.25}
+                value={font.renderer.paddingCells}
+                onChange={(event) =>
+                  updateFont((draft) => {
+                    draft.renderer.paddingCells = Math.max(0, Number(event.target.value))
+                  })
+                }
+              />
+            </label>
+            <div className="settings-note">Padding resolves to {formatCoord(renderPadding)} units in the SVG viewBox.</div>
           </div>
 
           <div className="export-actions">
@@ -617,55 +783,301 @@ function App() {
           </div>
         </aside>
       </section>
+
+      {isAtlasOpen && (
+        <AtlasWindow
+          atlasOrder={atlasOrder}
+          atlasCellSize={atlasCellSize}
+          atlasLayout={atlasLayout}
+          atlasPage={currentAtlasPage}
+          atlasPageCount={atlasPageCount}
+          digitsPerGlyph={font.core.digitsPerGlyph}
+          fill={font.renderer.fill}
+          pageSummary={atlasPageSummary}
+          showLabels={showAtlasLabels}
+          totalCount={atlasTotalCount}
+          onAtlasCellSizeChange={setAtlasCellSize}
+          onAtlasPageInputCommit={applyAtlasPageInput}
+          onClose={() => setIsAtlasOpen(false)}
+          onLabelsChange={setShowAtlasLabels}
+          onNext={() => setAtlasPageState(currentAtlasPage + 1n)}
+          onPrevious={() => setAtlasPageState(currentAtlasPage - 1n)}
+          onOrdered={() => setAtlasOrder('ordered')}
+          onShuffle={activateShuffle}
+        />
+      )}
     </main>
   )
 }
 
-type MultiplicationCell = {
-  row: number
-  column: number
+type AtlasCell = {
+  slot: bigint
   value: string
   render: ReturnType<typeof buildGlyphRender>
 }
 
-function MultiplicationTable({ font, cells }: { font: GlyphFont; cells: MultiplicationCell[][] }) {
-  const labels = Array.from({ length: 16 }, (_, index) => index.toString(8))
+type AtlasPageSummary = {
+  cells: Array<AtlasCell | null>
+  startSlot: bigint
+  endSlot: bigint
+  cellCount: number
+}
+
+type AtlasLayout = {
+  columns: number
+  rows: number
+  pageSize: number
+}
+
+type AtlasSummaryProps = {
+  atlasOrder: AtlasOrder
+  atlasCellSize: number
+  atlasLayout: AtlasLayout
+  atlasPage: bigint
+  atlasPageCount: bigint
+  digitsPerGlyph: number
+  pageSummary: AtlasPageSummary
+  renderPadding: number
+  showLabels: boolean
+  totalCount: bigint
+  onAtlasCellSizeChange: (value: number) => void
+  onLabelsChange: (value: boolean) => void
+  onOpen: () => void
+  onNext: () => void
+  onPrevious: () => void
+  onOrdered: () => void
+  onShuffle: () => void
+}
+
+function AtlasSummary({
+  atlasOrder,
+  atlasCellSize,
+  atlasLayout,
+  atlasPage,
+  atlasPageCount,
+  digitsPerGlyph,
+  pageSummary,
+  renderPadding,
+  showLabels,
+  totalCount,
+  onAtlasCellSizeChange,
+  onLabelsChange,
+  onOpen,
+  onNext,
+  onPrevious,
+  onOrdered,
+  onShuffle,
+}: AtlasSummaryProps) {
+  const slotStart = toPaddedOctal(pageSummary.startSlot, digitsPerGlyph)
+  const slotEnd = toPaddedOctal(pageSummary.endSlot, digitsPerGlyph)
 
   return (
-    <div className="table-panel" aria-label="16 by 16 multiplication table">
-      <div className="table-toolbar">
-        <span>16x16</span>
-        <span>{font.core.digitsPerGlyph} digit glyphs</span>
+    <div className="atlas-summary" aria-label="Paged glyph atlas">
+      <div className="atlas-summary-copy">
+        <h3>Fullscreen atlas</h3>
+        <p>
+          {formatBigInt(totalCount)} glyphs, {formatBigInt(atlasPageCount)} pages, {digitsPerGlyph} digits per glyph.
+        </p>
       </div>
-      <div className="multiplication-table-wrap">
-        <table className="multiplication-table">
-          <thead>
-            <tr>
-              <th scope="col">x</th>
-              {labels.map((label) => (
-                <th scope="col" key={label}>
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {cells.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                <th scope="row">{labels[rowIndex]}</th>
-                {row.map((cell) => (
-                  <td key={`${cell.row}-${cell.column}`}>
-                    <svg viewBox={cell.render.viewBox} aria-label={`${cell.row.toString(8)} x ${cell.column.toString(8)} = ${cell.value}`}>
-                      <path d={cell.render.path} fill={font.renderer.fill} fillRule="evenodd" />
-                    </svg>
-                    <span>{cell.value}</span>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="atlas-summary-meta">
+        <span>Page {formatBigInt(atlasPage + 1n)} / {formatBigInt(atlasPageCount)}</span>
+        <span>{atlasLayout.columns}x{atlasLayout.rows} page grid</span>
+        <span>{pageSummary.cellCount} glyphs on this page</span>
+        <span>{atlasOrder === 'ordered' ? `${slotStart} to ${slotEnd}` : `Shuffled slots ${slotStart} to ${slotEnd}`}</span>
+        <span>{formatCoord(renderPadding)} units padding</span>
       </div>
+      <div className="atlas-summary-actions">
+        <div className="atlas-order-switch">
+          <button type="button" className={atlasOrder === 'ordered' ? 'active' : ''} onClick={onOrdered}>
+            Ordered
+          </button>
+          <button type="button" className={atlasOrder === 'shuffled' ? 'active' : ''} onClick={onShuffle}>
+            Shuffle
+          </button>
+        </div>
+        <div className="atlas-view-controls">
+          <label>
+            <span>Cell</span>
+            <input
+              type="number"
+              min={72}
+              max={220}
+              value={atlasCellSize}
+              onChange={(event) => onAtlasCellSizeChange(clampNumber(Number(event.target.value), 72, 220))}
+            />
+          </label>
+          <label className="check-row compact-check">
+            <input type="checkbox" checked={showLabels} onChange={(event) => onLabelsChange(event.target.checked)} />
+            <span>Labels</span>
+          </label>
+        </div>
+        <div className="atlas-page-controls">
+          <button type="button" onClick={onPrevious} disabled={atlasPage === 0n}>
+            <ChevronLeft size={16} />
+          </button>
+          <button type="button" onClick={onNext} disabled={atlasPage >= atlasPageCount - 1n}>
+            <ChevronRight size={16} />
+          </button>
+          <button type="button" onClick={onOpen}>
+            <Maximize2 size={16} />
+            Open
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type AtlasWindowProps = {
+  atlasOrder: AtlasOrder
+  atlasCellSize: number
+  atlasLayout: AtlasLayout
+  atlasPage: bigint
+  atlasPageCount: bigint
+  digitsPerGlyph: number
+  fill: string
+  pageSummary: AtlasPageSummary
+  showLabels: boolean
+  totalCount: bigint
+  onAtlasCellSizeChange: (value: number) => void
+  onAtlasPageInputCommit: (value: string) => void
+  onClose: () => void
+  onLabelsChange: (value: boolean) => void
+  onNext: () => void
+  onPrevious: () => void
+  onOrdered: () => void
+  onShuffle: () => void
+}
+
+function AtlasWindow({
+  atlasOrder,
+  atlasCellSize,
+  atlasLayout,
+  atlasPage,
+  atlasPageCount,
+  digitsPerGlyph,
+  fill,
+  pageSummary,
+  showLabels,
+  totalCount,
+  onAtlasCellSizeChange,
+  onAtlasPageInputCommit,
+  onClose,
+  onLabelsChange,
+  onNext,
+  onPrevious,
+  onOrdered,
+  onShuffle,
+}: AtlasWindowProps) {
+  const slotStart = toPaddedOctal(pageSummary.startSlot, digitsPerGlyph)
+  const slotEnd = toPaddedOctal(pageSummary.endSlot, digitsPerGlyph)
+  const atlasGridStyle = {
+    '--atlas-cell-size': `${atlasCellSize}px`,
+    '--atlas-columns': atlasLayout.columns,
+    '--atlas-gap': `${ATLAS_GAP}px`,
+  } as CSSProperties
+
+  return (
+    <div className="atlas-overlay" role="presentation" onClick={onClose}>
+      <section
+        className="atlas-window"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Glyph atlas"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="atlas-header">
+          <div className="atlas-header-copy">
+            <h2>Glyph Atlas</h2>
+            <p>
+              {atlasLayout.columns} by {atlasLayout.rows} page grid over {formatBigInt(totalCount)} values with {digitsPerGlyph}-digit octal glyphs.
+            </p>
+          </div>
+          <div className="atlas-header-actions">
+            <div className="atlas-view-controls">
+              <label>
+                <span>Cell</span>
+                <input
+                  type="number"
+                  min={72}
+                  max={220}
+                  value={atlasCellSize}
+                  onChange={(event) => onAtlasCellSizeChange(clampNumber(Number(event.target.value), 72, 220))}
+                />
+              </label>
+              <label className="check-row compact-check">
+                <input type="checkbox" checked={showLabels} onChange={(event) => onLabelsChange(event.target.checked)} />
+                <span>Labels</span>
+              </label>
+            </div>
+            <div className="atlas-order-switch">
+              <button type="button" className={atlasOrder === 'ordered' ? 'active' : ''} onClick={onOrdered}>
+                Ordered
+              </button>
+              <button type="button" className={atlasOrder === 'shuffled' ? 'active' : ''} onClick={onShuffle}>
+                <Shuffle size={15} />
+                Shuffle
+              </button>
+            </div>
+            <div className="atlas-page-controls">
+              <button type="button" onClick={onPrevious} disabled={atlasPage === 0n} aria-label="Previous atlas page">
+                <ChevronLeft size={16} />
+              </button>
+              <label className="atlas-page-input">
+                <span>Page</span>
+                <input
+                  key={atlasPage.toString()}
+                  defaultValue={(atlasPage + 1n).toString()}
+                  onBlur={(event) => onAtlasPageInputCommit(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      onAtlasPageInputCommit(event.currentTarget.value)
+                    }
+                  }}
+                  inputMode="numeric"
+                  spellCheck={false}
+                />
+              </label>
+              <span className="atlas-page-total">/ {formatBigInt(atlasPageCount)}</span>
+              <button
+                type="button"
+                onClick={onNext}
+                disabled={atlasPage >= atlasPageCount - 1n}
+                aria-label="Next atlas page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <button type="button" className="atlas-close-button" onClick={onClose} aria-label="Close atlas">
+              <X size={16} />
+            </button>
+          </div>
+        </header>
+
+        <div className="atlas-info-bar">
+          <span>Page {formatBigInt(atlasPage + 1n)} of {formatBigInt(atlasPageCount)}</span>
+          <span>{pageSummary.cellCount} glyphs on screen</span>
+          <span>{atlasOrder === 'ordered' ? `Values ${slotStart} to ${slotEnd}` : `Shuffled slots ${slotStart} to ${slotEnd}`}</span>
+        </div>
+
+        <div className="atlas-grid-wrap">
+          <div className={`atlas-grid ${showLabels ? '' : 'labels-hidden'}`} style={atlasGridStyle}>
+            {pageSummary.cells.map((cell, index) =>
+              cell ? (
+                <article className="atlas-cell" key={cell.slot.toString()} title={`${cell.value} (slot ${cell.slot.toString(8)})`}>
+                  <svg viewBox={cell.render.viewBox} role="img" aria-label={`Glyph ${cell.value}`}>
+                    <path d={cell.render.path} fill={fill} fillRule="evenodd" />
+                  </svg>
+                  <span className="atlas-cell-value">{cell.value}</span>
+                  <span className="atlas-cell-slot">{toPaddedOctal(cell.slot, digitsPerGlyph)}</span>
+                </article>
+              ) : (
+                <div className="atlas-cell atlas-cell-empty" key={`empty-${index}`} aria-hidden="true" />
+              ),
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
@@ -987,18 +1399,43 @@ function ensureCoreHole(font: GlyphFont) {
   return font.core.holes[0]
 }
 
-function buildMultiplicationTable(font: GlyphFont): MultiplicationCell[][] {
-  return Array.from({ length: 16 }, (_, row) =>
-    Array.from({ length: 16 }, (_, column) => {
-      const value = (row * column).toString(8)
-      return {
-        row,
-        column,
-        value,
-        render: buildGlyphRender(font, value),
-      }
-    }),
-  )
+function buildAtlasPage(
+  font: GlyphFont,
+  page: bigint,
+  totalCount: bigint,
+  pageSizeNumber: number,
+  shuffled: boolean,
+  seed: number,
+): AtlasPageSummary {
+  const pageSize = BigInt(pageSizeNumber)
+  const safePage = clampAtlasPage(page, (totalCount + pageSize - 1n) / pageSize)
+  const startSlot = safePage * pageSize
+  const endExclusive = minBigInt(totalCount, startSlot + pageSize)
+  const cellCount = Number(endExclusive - startSlot)
+  const cells: Array<AtlasCell | null> = []
+
+  for (let cellIndex = 0; cellIndex < pageSizeNumber; cellIndex += 1) {
+    const slot = startSlot + BigInt(cellIndex)
+    if (slot >= totalCount) {
+      cells.push(null)
+      continue
+    }
+
+    const valueIndex = shuffled ? permuteAtlasIndex(slot, totalCount, seed) : slot
+    const value = toPaddedOctal(valueIndex, font.core.digitsPerGlyph)
+    cells.push({
+      slot,
+      value,
+      render: buildGlyphRender(font, value),
+    })
+  }
+
+  return {
+    cells,
+    startSlot,
+    endSlot: cellCount > 0 ? endExclusive - 1n : startSlot,
+    cellCount,
+  }
 }
 
 function createGridLines(gridSize: number, mode: GridMode) {
@@ -1199,6 +1636,93 @@ function midpoint(a: Point, b: Point): Point {
   }
 }
 
+function clampAtlasPage(page: bigint, pageCount: bigint) {
+  if (pageCount <= 1n) {
+    return 0n
+  }
+
+  if (page < 0n) {
+    return 0n
+  }
+
+  if (page >= pageCount) {
+    return pageCount - 1n
+  }
+
+  return page
+}
+
+function permuteAtlasIndex(index: bigint, totalCount: bigint, seed: number) {
+  if (totalCount <= 1n) {
+    return index
+  }
+
+  const nonce = BigInt(Math.max(1, seed))
+  let multiplier = (11400714819323198485n + nonce * 4099n) % totalCount
+
+  if (multiplier === 0n) {
+    multiplier = 1n
+  }
+  if (multiplier % 2n === 0n) {
+    multiplier = multiplier + 1n >= totalCount ? multiplier - 1n : multiplier + 1n
+  }
+
+  const offset = (6364136223846793005n * nonce + 1442695040888963407n) % totalCount
+  return (index * multiplier + offset) % totalCount
+}
+
+function toPaddedOctal(value: bigint, digitsPerGlyph: number) {
+  return value.toString(8).padStart(digitsPerGlyph, '0')
+}
+
+function parsePositiveInteger(value: string) {
+  if (!/^\d+$/.test(value)) {
+    return null
+  }
+
+  const parsed = BigInt(value)
+  return parsed <= 0n ? 1n : parsed
+}
+
+function minBigInt(left: bigint, right: bigint) {
+  return left < right ? left : right
+}
+
+function getInitialViewport() {
+  if (typeof window === 'undefined') {
+    return { width: 1280, height: 760 }
+  }
+
+  return { width: window.innerWidth, height: window.innerHeight }
+}
+
+function calculateAtlasLayout(viewport: { width: number; height: number }, cellSize: number): AtlasLayout {
+  const safeCellSize = clampNumber(cellSize, 72, 220)
+  const availableWidth = Math.max(safeCellSize, viewport.width - 64)
+  const availableHeight = Math.max(safeCellSize, viewport.height - 190)
+  const columns = Math.max(1, Math.floor((availableWidth + ATLAS_GAP) / (safeCellSize + ATLAS_GAP)))
+  const rows = Math.max(1, Math.floor((availableHeight + ATLAS_GAP) / (safeCellSize + ATLAS_GAP)))
+
+  return {
+    columns,
+    rows,
+    pageSize: columns * rows,
+  }
+}
+
+function sanitizeDecimalInput(value: string) {
+  return value.replace(/\D/g, '')
+}
+
+function octalToDecimalString(value: string) {
+  const clean = sanitizeOctalInput(value)
+  if (!clean) {
+    return '0'
+  }
+
+  return BigInt(`0o${clean}`).toString(10)
+}
+
 function clampNumber(value: number, min: number, max: number) {
   if (Number.isNaN(value)) {
     return min
@@ -1220,6 +1744,10 @@ function formatInputNumber(value: number) {
 
 function formatPathNumber(value: number) {
   return Number.parseFloat(value.toFixed(2)).toString()
+}
+
+function formatBigInt(value: bigint) {
+  return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
 export default App

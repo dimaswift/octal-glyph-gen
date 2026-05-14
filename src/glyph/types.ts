@@ -22,7 +22,8 @@ export type CoreGeometry = {
 
 export type GlyphRendererSettings = {
   fill: string
-  padding: number
+  gridSize: number
+  paddingCells: number
   precision: number
 }
 
