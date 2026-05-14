@@ -4,13 +4,34 @@ const socketStart: Point = { x: -8, y: -41.57 }
 const socketEnd: Point = { x: 8, y: -41.57 }
 
 export const DEFAULT_CORE_HOLE: Point[] = [
-  { x: 0, y: -27.71 },
-  { x: 24, y: -16 },
-  { x: 24, y: 13.86 },
-  { x: 0, y: 27.71 },
-  { x: -24, y: 13.86 },
-  { x: -24, y: -13.86 },
-  { x: 0, y: -27.71 },
+        {
+          "x": 8,
+          "y": 0
+        },
+        {
+          "x": 24,
+          "y": 0
+        },
+        {
+          "x": 24,
+          "y": 13.86
+        },
+        {
+          "x": 0,
+          "y": 27.71
+        },
+        {
+          "x": -24,
+          "y": 13.86
+        },
+        {
+          "x": -24,
+          "y": 0
+        },
+        {
+          "x": -8,
+          "y": 0
+        }
 ]
 
 export const DEFAULT_ARMS: ArmMap = {
