@@ -2164,10 +2164,6 @@ var OctalGlyphHex = (() => {
           y: 27.71
         },
         {
-          x: -32,
-          y: 27.71
-        },
-        {
           x: -40,
           y: 13.86
         },
@@ -2183,12 +2179,12 @@ var OctalGlyphHex = (() => {
       holes: [
         [
           {
-            x: 0,
-            y: -27.71
+            x: 8,
+            y: 0
           },
           {
             x: 24,
-            y: -16
+            y: 0
           },
           {
             x: 24,
@@ -2204,11 +2200,11 @@ var OctalGlyphHex = (() => {
           },
           {
             x: -24,
-            y: -13.86
+            y: 0
           },
           {
-            x: 0,
-            y: -27.71
+            x: -8,
+            y: 0
           }
         ]
       ],
@@ -2432,12 +2428,16 @@ var OctalGlyphHex = (() => {
   function render(value, options = {}) {
     const font = normalizeFont(options.font ?? DEFAULT_FONT);
     const input = valueToOctalString(value);
+    const precision = numberOr(options.precision, font.renderer.precision);
     const chunks = splitOctalChunks(input, font.core.digitsPerGlyph);
     const polygons = [];
     chunks.forEach((chunk, stackIndex) => {
       const yOffset = stackIndex * font.core.glyphSpacing;
-      const coreRing = pointListToRing(font.core.polygon.map((point) => translatePoint(point, 0, yOffset)));
-      const coreHoles = font.core.holes.map((hole) => pointListToRing(hole.map((point) => translatePoint(point, 0, yOffset)))).filter((ring) => ring.length >= 3);
+      const coreRing = pointListToRing(
+        font.core.polygon.map((point) => translatePoint(point, 0, yOffset)),
+        precision
+      );
+      const coreHoles = font.core.holes.map((hole) => pointListToRing(hole.map((point) => translatePoint(point, 0, yOffset)), precision)).filter((ring) => ring.length >= 3);
       if (coreRing.length >= 3) {
         polygons.push([coreRing, ...coreHoles]);
       }
@@ -2448,7 +2448,8 @@ var OctalGlyphHex = (() => {
         }
         const rotation = socketIndex * font.core.rotationStepDeg;
         const armRing = pointListToRing(
-          arm.map((point) => translatePoint(rotatePoint(point, rotation, font.core.origin), 0, yOffset))
+          arm.map((point) => translatePoint(rotatePoint(point, rotation, font.core.origin), 0, yOffset)),
+          precision
         );
         if (armRing.length >= 3) {
           polygons.push([armRing]);
@@ -2456,7 +2457,6 @@ var OctalGlyphHex = (() => {
       });
     });
     const multiPolygon = polygons.length > 0 ? (0, import_polygon_clipping.union)(polygons[0], ...polygons.slice(1)) : [];
-    const precision = numberOr(options.precision, font.renderer.precision);
     const paddingGridSize = numberOr(options.gridSize, font.renderer.gridSize);
     const paddingCells = numberOr(options.paddingCells, font.renderer.paddingCells);
     const padding = numberOr(options.padding, paddingGridSize * paddingCells);
@@ -2594,8 +2594,8 @@ var OctalGlyphHex = (() => {
   function translatePoint(point, dx, dy) {
     return { x: point.x + dx, y: point.y + dy };
   }
-  function pointListToRing(points) {
-    return points.map((point) => [round(point.x), round(point.y)]);
+  function pointListToRing(points, precision) {
+    return points.map((point) => [roundForBoolean(point.x, precision), roundForBoolean(point.y, precision)]);
   }
   function multiPolygonToPath(multiPolygon, precision = 2) {
     return multiPolygon.flatMap(
@@ -2778,6 +2778,10 @@ var OctalGlyphHex = (() => {
   }
   function round(value) {
     return Number.parseFloat(value.toFixed(6));
+  }
+  function roundForBoolean(value, precision) {
+    const digits = Math.max(0, Math.min(6, Math.round(precision)));
+    return Number.parseFloat(value.toFixed(digits));
   }
   function clampInteger(value, min, max) {
     return Math.max(min, Math.min(max, Math.round(value)));

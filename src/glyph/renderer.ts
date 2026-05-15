@@ -151,14 +151,18 @@ export function normalizeFont(rawInput: Partial<GlyphFont> | null | undefined = 
 
 export function buildGlyphRender(fontInput: GlyphFont, value: string): GlyphRender {
   const font = normalizeFont(fontInput)
+  const precision = font.renderer.precision
   const chunks = splitOctalChunks(value, font.core.digitsPerGlyph)
   const polygons: Polygon[] = []
 
   chunks.forEach((chunk, stackIndex) => {
     const yOffset = stackIndex * font.core.glyphSpacing
-    const coreRing = pointListToRing(font.core.polygon.map((point) => translatePoint(point, 0, yOffset)))
+    const coreRing = pointListToRing(
+      font.core.polygon.map((point) => translatePoint(point, 0, yOffset)),
+      precision,
+    )
     const coreHoles = font.core.holes
-      .map((hole) => pointListToRing(hole.map((point) => translatePoint(point, 0, yOffset))))
+      .map((hole) => pointListToRing(hole.map((point) => translatePoint(point, 0, yOffset)), precision))
       .filter((ring) => ring.length >= 3)
     if (coreRing.length >= 3) {
       polygons.push([coreRing, ...coreHoles])
@@ -173,6 +177,7 @@ export function buildGlyphRender(fontInput: GlyphFont, value: string): GlyphRend
       const rotation = socketIndex * font.core.rotationStepDeg
       const armRing = pointListToRing(
         arm.map((point) => translatePoint(rotatePoint(point, rotation, font.core.origin), 0, yOffset)),
+        precision,
       )
       if (armRing.length >= 3) {
         polygons.push([armRing])
@@ -182,7 +187,6 @@ export function buildGlyphRender(fontInput: GlyphFont, value: string): GlyphRend
 
   const multiPolygon = polygons.length > 0 ? union(polygons[0], ...polygons.slice(1)) : []
   const bounds = getStackedGlyphFrameBounds(font, chunks.length)
-  const precision = font.renderer.precision
   const path = multiPolygonToPath(multiPolygon, precision)
   const viewBox = boundsToViewBox(bounds, 0, precision)
   const svg = renderSvg(path, viewBox, font.renderer.fill)
@@ -319,8 +323,8 @@ function maxDistanceFromOrigin(bounds: Bounds, origin: Point, axis: 'x' | 'y') {
   return Math.max(Math.abs(bounds.minY - origin.y), Math.abs(bounds.maxY - origin.y))
 }
 
-function pointListToRing(points: Point[]): Ring {
-  return points.map((point) => [round(point.x), round(point.y)])
+function pointListToRing(points: Point[], precision: number): Ring {
+  return points.map((point) => [roundForBoolean(point.x, precision), roundForBoolean(point.y, precision)])
 }
 
 function boundsToViewBox(bounds: Bounds, padding: number, precision: number) {
@@ -345,6 +349,11 @@ function formatNumber(value: number, precision: number) {
 
 function round(value: number) {
   return Number.parseFloat(value.toFixed(6))
+}
+
+function roundForBoolean(value: number, precision: number) {
+  const digits = Math.max(0, Math.min(6, Math.round(precision)))
+  return Number.parseFloat(value.toFixed(digits))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
