@@ -113,6 +113,7 @@ h3 {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
   letter-spacing: 0;
@@ -144,13 +145,15 @@ button:hover:not(:disabled) {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid rgba(20, 184, 166, 0.42);
   outline-offset: 2px;
 }
 
 button:disabled,
-input:disabled {
+input:disabled,
+select:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
@@ -342,11 +345,16 @@ input:disabled {
 }
 
 .point-editor,
+.core-generator,
 .settings-block {
   display: grid;
   gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+.core-generator {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .coord-grid {
@@ -356,6 +364,7 @@ input:disabled {
 }
 
 .coord-grid label,
+.core-generator label,
 .settings-block label,
 .settings-field {
   display: grid;
@@ -363,6 +372,7 @@ input:disabled {
 }
 
 .coord-grid span,
+.core-generator span,
 .settings-block span,
 .settings-field > span {
   display: inline-flex;
@@ -374,7 +384,47 @@ input:disabled {
 }
 
 .coord-grid input,
+.core-generator input,
+.core-generator select,
 .settings-block input {
+  min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  color: var(--ink);
+  background: var(--input-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 0 9px;
+}
+
+.core-generator input[aria-invalid='true'] {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+}
+
+.core-generator .settings-note {
+  grid-column: 1 / -1;
+}
+
+.ring-helper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.ring-helper label {
+  display: grid;
+  gap: 5px;
+}
+
+.ring-helper span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.ring-helper input {
   min-width: 0;
   height: 34px;
   box-sizing: border-box;
@@ -919,6 +969,10 @@ input:disabled {
 
   .digit-strip {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .core-generator {
+    grid-template-columns: 1fr;
   }
 
   .atlas-overlay {

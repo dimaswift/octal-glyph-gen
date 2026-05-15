@@ -29,44 +29,63 @@ import {
   useState,
 } from 'react'
 import './App.css'
-import { DEFAULT_ARMS, DEFAULT_CORE_HOLE, DEFAULT_FONT, cloneDefaultFont } from './glyph/defaultFont'
+import {
+  createRegularCoreGeometry,
+  insetConvexPolygon,
+} from './glyph/coreGeometry'
+import { DEFAULT_ARMS, DEFAULT_FONT, cloneDefaultFont } from './glyph/defaultFont'
 import {
   alignArmEndpoints,
+  armToWorldPoints,
   buildGlyphRender,
+  getGlyphSpecies,
   getRenderPadding,
+  getSpeciesName,
   hasInvalidOctalDigits,
   normalizeFont,
+  normalizeDigitOrder,
   pointsToSvg,
-  rotatePoint,
   sanitizeOctalInput,
+  socketWorldToLocal,
 } from './glyph/renderer'
-import { DIGIT_KEYS, type DigitKey, type GlyphFont, type Point } from './glyph/types'
+import {
+  DIGIT_KEYS,
+  SPECIES_DIGIT_COUNTS,
+  type DigitKey,
+  type GlyphFont,
+  type Point,
+  type SocketSegment,
+} from './glyph/types'
 
 type EditorMode = 'arms' | 'core'
 type CoreLayer = 'outer' | 'hole'
 type GridMode = 'square' | 'diagonal' | 'triangular'
 type OutputMode = 'preview' | 'atlas'
-type SocketEndpoint = 'start' | 'end'
 type AtlasOrder = 'ordered' | 'shuffled'
 type Theme = 'light' | 'dark'
+type SocketEndpoint = 'start' | 'end'
 
 type DragTarget =
   | { kind: 'arm'; index: number }
   | { kind: 'core'; layer: CoreLayer; index: number }
-  | { kind: 'socket'; endpoint: SocketEndpoint }
+  | { kind: 'socket'; socketIndex: number; endpoint: SocketEndpoint }
 
 const VIEWBOX_EXTENT = 180
 const ATLAS_GAP = 8
 const DEFAULT_ATLAS_CELL_SIZE = 112
+const DEFAULT_RING_THICKNESS = 14
 
 function App() {
   const [font, setFont] = useState<GlyphFont>(() => cloneDefaultFont())
+  const [selectedSpeciesDigits, setSelectedSpeciesDigits] = useState(DEFAULT_FONT.defaultSpeciesDigits ?? DEFAULT_FONT.core.digitsPerGlyph)
   const [mode, setMode] = useState<EditorMode>('arms')
   const [selectedDigit, setSelectedDigit] = useState<DigitKey>('2')
   const [selectedArmPoint, setSelectedArmPoint] = useState(1)
-  const [selectedCoreLayer, setSelectedCoreLayer] = useState<CoreLayer>('outer')
+  const [selectedCoreLayer, setSelectedCoreLayer] = useState<CoreLayer>('hole')
   const [selectedCorePoint, setSelectedCorePoint] = useState(0)
-  const [selectedSocket, setSelectedSocket] = useState<SocketEndpoint>('start')
+  const [selectedSocketIndex, setSelectedSocketIndex] = useState(0)
+  const [selectedSocketEndpoint, setSelectedSocketEndpoint] = useState<SocketEndpoint>('start')
+  const [ringThickness, setRingThickness] = useState(DEFAULT_RING_THICKNESS)
   const [gridSize, setGridSize] = useState(DEFAULT_FONT.renderer.gridSize)
   const [gridMode, setGridMode] = useState<GridMode>('square')
   const [snapToGrid, setSnapToGrid] = useState(true)
@@ -84,11 +103,24 @@ function App() {
   const [status, setStatus] = useState('Ready')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const renderResult = useMemo(() => buildGlyphRender(font, octalInput), [font, octalInput])
-  const renderPadding = useMemo(() => getRenderPadding(font), [font])
+  const activeSpecies = useMemo(() => getGlyphSpecies(font, selectedSpeciesDigits), [font, selectedSpeciesDigits])
+  const activeFont = useMemo(
+    () => ({
+      ...font,
+      defaultSpeciesDigits: activeSpecies.digitsPerGlyph,
+      core: activeSpecies.core,
+    }),
+    [activeSpecies, font],
+  )
+  const activeDigitOrderText = activeSpecies.digitOrder.join('')
+  const [digitOrderDraft, setDigitOrderDraft] = useState<{ digitsPerGlyph: number; value: string } | null>(null)
+  const digitOrderInput =
+    digitOrderDraft?.digitsPerGlyph === selectedSpeciesDigits ? digitOrderDraft.value : activeDigitOrderText
+  const renderResult = useMemo(() => buildGlyphRender(font, octalInput, selectedSpeciesDigits), [font, octalInput, selectedSpeciesDigits])
+  const renderPadding = useMemo(() => getRenderPadding(activeFont), [activeFont])
   const atlasLayout = useMemo(() => calculateAtlasLayout(viewport, atlasCellSize), [atlasCellSize, viewport])
   const atlasPageSize = BigInt(atlasLayout.pageSize)
-  const atlasTotalCount = useMemo(() => 8n ** BigInt(font.core.digitsPerGlyph), [font.core.digitsPerGlyph])
+  const atlasTotalCount = useMemo(() => 8n ** BigInt(selectedSpeciesDigits), [selectedSpeciesDigits])
   const atlasPageCount = useMemo(
     () => (atlasTotalCount + atlasPageSize - 1n) / atlasPageSize,
     [atlasPageSize, atlasTotalCount],
@@ -98,21 +130,32 @@ function App() {
   const atlasPageSummary = useMemo(
     () =>
       atlasActive
-        ? buildAtlasPage(font, currentAtlasPage, atlasTotalCount, atlasLayout.pageSize, atlasOrder === 'shuffled', atlasSeed)
+        ? buildAtlasPage(
+            font,
+            selectedSpeciesDigits,
+            currentAtlasPage,
+            atlasTotalCount,
+            atlasLayout.pageSize,
+            atlasOrder === 'shuffled',
+            atlasSeed,
+          )
         : {
             cells: [],
             startSlot: currentAtlasPage * atlasPageSize,
             endSlot: currentAtlasPage * atlasPageSize,
             cellCount: 0,
           },
-    [atlasActive, atlasLayout.pageSize, atlasOrder, atlasPageSize, atlasSeed, atlasTotalCount, currentAtlasPage, font],
+    [atlasActive, atlasLayout.pageSize, atlasOrder, atlasPageSize, atlasSeed, atlasTotalCount, currentAtlasPage, font, selectedSpeciesDigits],
   )
   const exportJson = useMemo(() => JSON.stringify(font, null, 2), [font])
-  const activeArm = alignArmEndpoints(font, font.arms[selectedDigit])
+  const activeArm = alignArmEndpoints(activeFont, activeFont.arms[selectedDigit])
   const activeArmPoint = activeArm[selectedArmPoint] ?? activeArm[0]
-  const coreIsHollow = font.core.holes.length > 0
-  const activeCorePoints = selectedCoreLayer === 'hole' ? (font.core.holes[0] ?? DEFAULT_CORE_HOLE) : font.core.polygon
-  const activeCorePoint = activeCorePoints[selectedCorePoint] ?? activeCorePoints[0]
+  const coreIsHollow = activeFont.core.holes.length > 0
+  const activeCorePoints = activeFont.core.holes[0] ?? []
+  const activeCorePoint = activeCorePoints[selectedCorePoint] ?? activeCorePoints[0] ?? activeFont.core.origin
+  const activeSocketIndex = Math.min(selectedSocketIndex, Math.max(0, activeFont.core.sockets.length - 1))
+  const selectedSocket = activeFont.core.sockets[activeSocketIndex] ?? activeFont.core.sockets[0]
+  const selectedSocketPoint = selectedSocket?.[selectedSocketEndpoint] ?? activeFont.core.origin
   const invalidInput = hasInvalidOctalDigits(octalInput)
   const cleanInput = sanitizeOctalInput(octalInput) || '0'
 
@@ -146,9 +189,30 @@ function App() {
   function updateFont(mutator: (draft: GlyphFont) => void) {
     setFont((current) => {
       const draft = structuredClone(current)
+      loadActiveSpeciesCore(draft, selectedSpeciesDigits)
       mutator(draft)
+      saveActiveSpeciesCore(draft, selectedSpeciesDigits)
       return normalizeFont(draft)
     })
+  }
+
+  function selectSpecies(digitsPerGlyph: number) {
+    if (!SPECIES_DIGIT_COUNTS.includes(digitsPerGlyph as (typeof SPECIES_DIGIT_COUNTS)[number])) {
+      return
+    }
+
+    setSelectedSpeciesDigits(digitsPerGlyph)
+    setFont((current) => {
+      const draft = structuredClone(current)
+      loadActiveSpeciesCore(draft, digitsPerGlyph)
+      saveActiveSpeciesCore(draft, digitsPerGlyph)
+      return normalizeFont(draft)
+    })
+    setAtlasPage(0n)
+    setDigitOrderDraft(null)
+    setSelectedCorePoint(0)
+    setSelectedSocketIndex(0)
+    setSelectedSocketEndpoint('start')
   }
 
   function updateArmPoint(index: number, point: Point) {
@@ -161,25 +225,82 @@ function App() {
     })
   }
 
-  function updateCorePoint(layer: CoreLayer, index: number, point: Point) {
+  function updateCorePoint(_layer: CoreLayer, index: number, point: Point) {
     updateFont((draft) => {
-      if (layer === 'hole') {
-        draft.core.holes[0] = draft.core.holes[0] ?? structuredClone(DEFAULT_CORE_HOLE)
-        draft.core.holes[0][index] = point
-      } else {
-        draft.core.polygon[index] = point
+      const target = ensureCoreHole(draft, ringThickness)
+      target[index] = point
+    })
+  }
+
+  function updateGeneratedCore(
+    updates: Partial<Pick<GlyphFont['core'], 'digitsPerGlyph' | 'socketWidth' | 'coreRadius' | 'angleOffsetDeg'>>,
+  ) {
+    updateFont((draft) => {
+      const nextCore = createRegularCoreGeometry({
+        origin: draft.core.origin,
+        digitsPerGlyph: updates.digitsPerGlyph ?? draft.core.digitsPerGlyph,
+        socketWidth: updates.socketWidth ?? draft.core.socketWidth,
+        coreRadius: updates.coreRadius ?? draft.core.coreRadius,
+        angleOffsetDeg: updates.angleOffsetDeg ?? draft.core.angleOffsetDeg,
+      })
+      draft.core = {
+        ...draft.core,
+        ...nextCore,
+        customCore: false,
       }
     })
   }
 
-  function updateSocket(endpoint: SocketEndpoint, point: Point) {
+  function setCustomCore(enabled: boolean) {
     updateFont((draft) => {
-      if (endpoint === 'start') {
-        draft.core.socketStart = point
-      } else {
-        draft.core.socketEnd = point
+      if (enabled) {
+        draft.core.customCore = true
+        draft.core.sockets = structuredClone(draft.core.sockets)
+        draft.core.polygon = draft.core.sockets.flatMap((socket) => [socket.start, socket.end])
+        return
+      }
+
+      const nextCore = createRegularCoreGeometry({
+        origin: draft.core.origin,
+        digitsPerGlyph: draft.core.digitsPerGlyph,
+        socketWidth: draft.core.socketWidth,
+        coreRadius: draft.core.coreRadius,
+        angleOffsetDeg: draft.core.angleOffsetDeg,
+      })
+      draft.core = {
+        ...draft.core,
+        ...nextCore,
+        customCore: false,
       }
     })
+    setSelectedSocketIndex(0)
+    setSelectedSocketEndpoint('start')
+  }
+
+  function updateSocketPoint(socketIndex: number, endpoint: SocketEndpoint, point: Point) {
+    updateFont((draft) => {
+      draft.core.customCore = true
+      const socket = draft.core.sockets[socketIndex]
+      if (!socket) {
+        return
+      }
+      socket[endpoint] = point
+      draft.core.polygon = draft.core.sockets.flatMap((segment) => [segment.start, segment.end])
+      if (socketIndex === 0) {
+        draft.core.socketStart = draft.core.sockets[0].start
+        draft.core.socketEnd = draft.core.sockets[0].end
+      }
+    })
+  }
+
+  function makeCoreRing() {
+    updateFont((draft) => {
+      draft.core.holes = [insetConvexPolygon(draft.core.polygon, ringThickness)]
+    })
+    setSelectedCoreLayer('hole')
+    setSelectedCorePoint(0)
+    setSelectedSocketIndex(0)
+    setSelectedSocketEndpoint('start')
   }
 
   function handleOctalInputChange(value: string) {
@@ -191,6 +312,22 @@ function App() {
     const cleanDecimal = sanitizeDecimalInput(value)
     setDecimalInput(cleanDecimal)
     setOctalInput(cleanDecimal === '' ? '' : BigInt(cleanDecimal).toString(8))
+  }
+
+  function handleDigitOrderChange(value: string) {
+    const cleanOrder = value.replace(/\D/g, '').slice(0, selectedSpeciesDigits)
+    setDigitOrderDraft({ digitsPerGlyph: selectedSpeciesDigits, value: cleanOrder })
+
+    if (!isValidDigitOrder(cleanOrder, selectedSpeciesDigits)) {
+      setStatus(`Use each index 0-${selectedSpeciesDigits - 1} exactly once`)
+      return
+    }
+
+    updateFont((draft) => {
+      const species = ensureDraftSpecies(draft, selectedSpeciesDigits)
+      species.digitOrder = normalizeDigitOrder(cleanOrder, selectedSpeciesDigits)
+    })
+    setStatus(`${getSpeciesName(selectedSpeciesDigits)} order updated`)
   }
 
   function addArmPoint() {
@@ -219,12 +356,16 @@ function App() {
 
   function addCorePoint() {
     const points = activeCorePoints
+    if (points.length < 3) {
+      makeCoreRing()
+      return
+    }
     const insertAt = selectedCorePoint + 1
     const previous = points[selectedCorePoint]
     const next = points[insertAt % points.length]
 
     updateFont((draft) => {
-      const target = selectedCoreLayer === 'hole' ? ensureCoreHole(draft) : draft.core.polygon
+      const target = ensureCoreHole(draft, ringThickness)
       target.splice(insertAt, 0, midpoint(previous, next))
     })
     setSelectedCorePoint(insertAt)
@@ -237,7 +378,7 @@ function App() {
 
     const nextSelectedPoint = Math.max(0, Math.min(selectedCorePoint - 1, activeCorePoints.length - 2))
     updateFont((draft) => {
-      const target = selectedCoreLayer === 'hole' ? ensureCoreHole(draft) : draft.core.polygon
+      const target = ensureCoreHole(draft, ringThickness)
       target.splice(selectedCorePoint, 1)
     })
     setSelectedCorePoint(nextSelectedPoint)
@@ -245,9 +386,9 @@ function App() {
 
   function setCoreHollow(enabled: boolean) {
     updateFont((draft) => {
-      draft.core.holes = enabled ? [structuredClone(draft.core.holes[0] ?? DEFAULT_CORE_HOLE)] : []
+      draft.core.holes = enabled ? [structuredClone(draft.core.holes[0] ?? insetConvexPolygon(draft.core.polygon, ringThickness))] : []
     })
-    setSelectedCoreLayer(enabled ? 'hole' : 'outer')
+    setSelectedCoreLayer('hole')
     setSelectedCorePoint(0)
   }
 
@@ -260,11 +401,10 @@ function App() {
 
   function resetCore() {
     updateFont((draft) => {
-      draft.core = structuredClone(DEFAULT_FONT.core)
+      draft.core = structuredClone(getGlyphSpecies(DEFAULT_FONT, selectedSpeciesDigits).core)
     })
-    setSelectedCoreLayer('outer')
+    setSelectedCoreLayer('hole')
     setSelectedCorePoint(0)
-    setSelectedSocket('start')
   }
 
   function resetFont() {
@@ -272,11 +412,15 @@ function App() {
     setGridSize(DEFAULT_FONT.renderer.gridSize)
     setAtlasOrder('ordered')
     setAtlasPage(0n)
+    setDigitOrderDraft(null)
+    setSelectedSpeciesDigits(DEFAULT_FONT.defaultSpeciesDigits ?? DEFAULT_FONT.core.digitsPerGlyph)
     setSelectedDigit('2')
     setSelectedArmPoint(1)
-    setSelectedCoreLayer('outer')
+    setSelectedCoreLayer('hole')
     setSelectedCorePoint(0)
-    setSelectedSocket('start')
+    setSelectedSocketIndex(0)
+    setSelectedSocketEndpoint('start')
+    setRingThickness(DEFAULT_RING_THICKNESS)
     setStatus('Reset to default font')
   }
 
@@ -327,6 +471,8 @@ function App() {
       const parsed = JSON.parse(await file.text()) as Partial<GlyphFont>
       const nextFont = normalizeFont(parsed)
       setFont(nextFont)
+      setSelectedSpeciesDigits(nextFont.defaultSpeciesDigits ?? nextFont.core.digitsPerGlyph)
+      setDigitOrderDraft(null)
       setGridSize(nextFont.renderer.gridSize)
       setAtlasOrder('ordered')
       setAtlasPage(0n)
@@ -420,7 +566,7 @@ function App() {
                     key={digit}
                     onClick={() => {
                       setSelectedDigit(digit)
-                      setSelectedArmPoint(Math.min(1, font.arms[digit].length - 1))
+                      setSelectedArmPoint(Math.min(1, activeFont.arms[digit].length - 1))
                     }}
                   >
                     {digit}
@@ -461,79 +607,178 @@ function App() {
             </>
           ) : (
             <>
+              <div className="core-generator">
+                <label>
+                  <span>Species</span>
+                  <select value={selectedSpeciesDigits} onChange={(event) => selectSpecies(Number(event.target.value))}>
+                    {SPECIES_DIGIT_COUNTS.map((digitsPerGlyph) => (
+                      <option key={digitsPerGlyph} value={digitsPerGlyph}>
+                        {getSpeciesName(digitsPerGlyph)} ({digitsPerGlyph})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>LSB to MSB</span>
+                  <input
+                    value={digitOrderInput}
+                    inputMode="numeric"
+                    spellCheck={false}
+                    aria-invalid={!isValidDigitOrder(digitOrderInput, selectedSpeciesDigits)}
+                    onChange={(event) => handleDigitOrderChange(event.target.value)}
+                    onBlur={() => setDigitOrderDraft(null)}
+                  />
+                </label>
+                <label>
+                  <span>Socket width</span>
+                  <input
+                    type="number"
+                    min={0.25}
+                    step={0.25}
+                    inputMode="decimal"
+                    value={formatInputNumber(activeFont.core.socketWidth)}
+                    disabled={activeFont.core.customCore}
+                    onChange={(event) => {
+                      const value = parseNumberInput(event.target.value)
+                      if (value !== null) {
+                        updateGeneratedCore({ socketWidth: clampNumber(value, 0.25, 160) })
+                      }
+                    }}
+                  />
+                </label>
+                <label>
+                  <span>Core radius</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={0.25}
+                    inputMode="decimal"
+                    value={formatInputNumber(activeFont.core.coreRadius)}
+                    disabled={activeFont.core.customCore}
+                    onChange={(event) => {
+                      const value = parseNumberInput(event.target.value)
+                      if (value !== null) {
+                        updateGeneratedCore({ coreRadius: clampNumber(value, 1, 220) })
+                      }
+                    }}
+                  />
+                </label>
+                <label>
+                  <span>Angle offset</span>
+                  <input
+                    type="number"
+                    step={0.5}
+                    inputMode="decimal"
+                    value={formatInputNumber(activeFont.core.angleOffsetDeg)}
+                    disabled={activeFont.core.customCore}
+                    onChange={(event) => {
+                      const value = parseNumberInput(event.target.value)
+                      if (value !== null) {
+                        updateGeneratedCore({ angleOffsetDeg: value })
+                      }
+                    }}
+                  />
+                </label>
+                <div className="settings-note">Socket step is {formatCoord(activeFont.core.rotationStepDeg)} degrees.</div>
+              </div>
+
+              <label className="check-row">
+                <input type="checkbox" checked={activeFont.core.customCore} onChange={(event) => setCustomCore(event.target.checked)} />
+                <span>Custom core</span>
+              </label>
+
+              {activeFont.core.customCore && (
+                <div className="point-editor">
+                  <h3>Socket {selectedSocketIndex}</h3>
+                  <SocketList
+                    sockets={activeFont.core.sockets}
+                    selectedIndex={activeSocketIndex}
+                    onSelect={setSelectedSocketIndex}
+                  />
+                  <div className="socket-switch">
+                    <button
+                      type="button"
+                      className={selectedSocketEndpoint === 'start' ? 'active' : ''}
+                      onClick={() => setSelectedSocketEndpoint('start')}
+                    >
+                      Start
+                    </button>
+                    <button
+                      type="button"
+                      className={selectedSocketEndpoint === 'end' ? 'active' : ''}
+                      onClick={() => setSelectedSocketEndpoint('end')}
+                    >
+                      End
+                    </button>
+                  </div>
+                  <CoordinateInputs
+                    point={selectedSocketPoint}
+                    onChange={(point) => updateSocketPoint(activeSocketIndex, selectedSocketEndpoint, point)}
+                  />
+                </div>
+              )}
+
               <label className="check-row">
                 <input type="checkbox" checked={coreIsHollow} onChange={(event) => setCoreHollow(event.target.checked)} />
                 <span>Hollow core</span>
               </label>
 
-              <div className="socket-switch">
-                <button
-                  type="button"
-                  className={selectedCoreLayer === 'outer' ? 'active' : ''}
-                  onClick={() => {
-                    setSelectedCoreLayer('outer')
-                    setSelectedCorePoint(0)
-                  }}
-                >
-                  Outer
-                </button>
-                <button
-                  type="button"
-                  className={selectedCoreLayer === 'hole' ? 'active' : ''}
-                  disabled={!coreIsHollow}
-                  onClick={() => {
-                    setSelectedCoreLayer('hole')
-                    setSelectedCorePoint(0)
-                  }}
-                >
-                  Hole
-                </button>
+              <div className="point-editor">
+                <h3>Ring helper</h3>
+                <div className="ring-helper">
+                  <label>
+                    <span>Thickness</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      step={0.25}
+                      inputMode="decimal"
+                      value={ringThickness}
+                      onChange={(event) => {
+                        const value = parseNumberInput(event.target.value)
+                        if (value !== null) {
+                          setRingThickness(clampNumber(value, 1, 120))
+                        }
+                      }}
+                    />
+                  </label>
+                  <button type="button" onClick={makeCoreRing}>
+                    Set ring
+                  </button>
+                </div>
               </div>
 
-              <PointList points={activeCorePoints} selectedIndex={selectedCorePoint} onSelect={setSelectedCorePoint} />
+              {coreIsHollow ? (
+                <>
+                  <PointList points={activeCorePoints} selectedIndex={selectedCorePoint} onSelect={setSelectedCorePoint} />
 
-              <div className="point-editor">
-                <h3>{selectedCoreLayer === 'hole' ? 'Hole' : 'Core'} point {selectedCorePoint}</h3>
-                <CoordinateInputs
-                  point={activeCorePoint}
-                  onChange={(point) => updateCorePoint(selectedCoreLayer, selectedCorePoint, point)}
-                />
+                  <div className="point-editor">
+                    <h3>Hole point {selectedCorePoint}</h3>
+                    <CoordinateInputs
+                      point={activeCorePoint}
+                      onChange={(point) => updateCorePoint('hole', selectedCorePoint, point)}
+                    />
+                    <div className="button-row">
+                      <IconButton title="Add hole point" onClick={addCorePoint}>
+                        <Plus size={16} />
+                      </IconButton>
+                      <IconButton title="Delete hole point" onClick={deleteCorePoint} disabled={activeCorePoints.length <= 3}>
+                        <Trash2 size={16} />
+                      </IconButton>
+                      <IconButton title="Reset core" onClick={resetCore}>
+                        <RotateCcw size={16} />
+                      </IconButton>
+                    </div>
+                  </div>
+                </>
+              ) : (
                 <div className="button-row">
-                  <IconButton title="Add core point" onClick={addCorePoint}>
-                    <Plus size={16} />
-                  </IconButton>
-                  <IconButton title="Delete core point" onClick={deleteCorePoint} disabled={activeCorePoints.length <= 3}>
-                    <Trash2 size={16} />
-                  </IconButton>
                   <IconButton title="Reset core" onClick={resetCore}>
                     <RotateCcw size={16} />
                   </IconButton>
                 </div>
-              </div>
-
-              <div className="point-editor">
-                <h3>Socket {selectedSocket}</h3>
-                <div className="socket-switch">
-                  <button
-                    type="button"
-                    className={selectedSocket === 'start' ? 'active' : ''}
-                    onClick={() => setSelectedSocket('start')}
-                  >
-                    Start
-                  </button>
-                  <button
-                    type="button"
-                    className={selectedSocket === 'end' ? 'active' : ''}
-                    onClick={() => setSelectedSocket('end')}
-                  >
-                    End
-                  </button>
-                </div>
-                <CoordinateInputs
-                  point={selectedSocket === 'start' ? font.core.socketStart : font.core.socketEnd}
-                  onChange={(point) => updateSocket(selectedSocket, point)}
-                />
-              </div>
+              )}
             </>
           )}
 
@@ -582,37 +827,11 @@ function App() {
               </div>
             </div>
             <label>
-              <span>Digits</span>
-              <input
-                type="number"
-                min={1}
-                max={32}
-                value={font.core.digitsPerGlyph}
-                onChange={(event) =>
-                  updateFont((draft) => {
-                    draft.core.digitsPerGlyph = clampNumber(Number(event.target.value), 1, 32)
-                  })
-                }
-              />
-            </label>
-            <label>
-              <span>Step</span>
-              <input
-                type="number"
-                value={font.core.rotationStepDeg}
-                onChange={(event) =>
-                  updateFont((draft) => {
-                    draft.core.rotationStepDeg = Number(event.target.value)
-                  })
-                }
-              />
-            </label>
-            <label>
               <span>Stack</span>
               <input
                 type="number"
                 min={80}
-                value={font.core.glyphSpacing}
+                value={activeFont.core.glyphSpacing}
                 onChange={(event) =>
                   updateFont((draft) => {
                     draft.core.glyphSpacing = Number(event.target.value)
@@ -625,23 +844,25 @@ function App() {
 
         <section className="canvas-panel">
           <EditorCanvas
-            font={font}
+            font={activeFont}
             mode={mode}
             selectedDigit={selectedDigit}
             selectedArmPoint={selectedArmPoint}
             selectedCoreLayer={selectedCoreLayer}
             selectedCorePoint={selectedCorePoint}
-            selectedSocket={selectedSocket}
+            selectedSocketEndpoint={selectedSocketEndpoint}
+            selectedSocketIndex={activeSocketIndex}
             gridSize={gridSize}
             gridMode={gridMode}
             snapToGrid={snapToGrid}
             onArmPointChange={updateArmPoint}
             onCorePointChange={updateCorePoint}
-            onSocketChange={updateSocket}
+            onSocketPointChange={updateSocketPoint}
             onSelectArmPoint={setSelectedArmPoint}
             onSelectCoreLayer={setSelectedCoreLayer}
             onSelectCorePoint={setSelectedCorePoint}
-            onSelectSocket={setSelectedSocket}
+            onSelectSocketEndpoint={setSelectedSocketEndpoint}
+            onSelectSocketIndex={setSelectedSocketIndex}
           />
         </section>
 
@@ -694,7 +915,7 @@ function App() {
               atlasLayout={atlasLayout}
               atlasPage={currentAtlasPage}
               atlasPageCount={atlasPageCount}
-              digitsPerGlyph={font.core.digitsPerGlyph}
+              digitsPerGlyph={selectedSpeciesDigits}
               pageSummary={atlasPageSummary}
               renderPadding={renderPadding}
               showLabels={showAtlasLabels}
@@ -791,7 +1012,7 @@ function App() {
           atlasLayout={atlasLayout}
           atlasPage={currentAtlasPage}
           atlasPageCount={atlasPageCount}
-          digitsPerGlyph={font.core.digitsPerGlyph}
+          digitsPerGlyph={selectedSpeciesDigits}
           fill={font.renderer.fill}
           pageSummary={atlasPageSummary}
           showLabels={showAtlasLabels}
@@ -1089,17 +1310,19 @@ type EditorCanvasProps = {
   selectedArmPoint: number
   selectedCoreLayer: CoreLayer
   selectedCorePoint: number
-  selectedSocket: SocketEndpoint
+  selectedSocketEndpoint: SocketEndpoint
+  selectedSocketIndex: number
   gridSize: number
   gridMode: GridMode
   snapToGrid: boolean
   onArmPointChange: (index: number, point: Point) => void
   onCorePointChange: (layer: CoreLayer, index: number, point: Point) => void
-  onSocketChange: (endpoint: SocketEndpoint, point: Point) => void
+  onSocketPointChange: (socketIndex: number, endpoint: SocketEndpoint, point: Point) => void
   onSelectArmPoint: (index: number) => void
   onSelectCoreLayer: (layer: CoreLayer) => void
   onSelectCorePoint: (index: number) => void
-  onSelectSocket: (endpoint: SocketEndpoint) => void
+  onSelectSocketEndpoint: (endpoint: SocketEndpoint) => void
+  onSelectSocketIndex: (index: number) => void
 }
 
 function EditorCanvas({
@@ -1109,30 +1332,27 @@ function EditorCanvas({
   selectedArmPoint,
   selectedCoreLayer,
   selectedCorePoint,
-  selectedSocket,
+  selectedSocketEndpoint,
+  selectedSocketIndex,
   gridSize,
   gridMode,
   snapToGrid,
   onArmPointChange,
   onCorePointChange,
-  onSocketChange,
+  onSocketPointChange,
   onSelectArmPoint,
   onSelectCoreLayer,
   onSelectCorePoint,
-  onSelectSocket,
+  onSelectSocketEndpoint,
+  onSelectSocketIndex,
 }: EditorCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null)
   const activeArm = alignArmEndpoints(font, font.arms[selectedDigit])
+  const activeArmWorld = armToWorldPoints(font, activeArm, 0)
   const gridLines = useMemo(() => createGridLines(gridSize, gridMode), [gridSize, gridMode])
   const corePreviewPath = pointsToPath([font.core.polygon, ...font.core.holes])
-  const socketCopies = Array.from({ length: font.core.digitsPerGlyph }, (_, socketIndex) => {
-    const rotation = socketIndex * font.core.rotationStepDeg
-    return {
-      start: rotatePoint(font.core.socketStart, rotation, font.core.origin),
-      end: rotatePoint(font.core.socketEnd, rotation, font.core.origin),
-    }
-  })
+  const socketCopies = font.core.sockets
 
   function pointerToPoint(event: ReactPointerEvent<SVGSVGElement>) {
     const svg = svgRef.current
@@ -1159,13 +1379,13 @@ function EditorCanvas({
     }
 
     if (dragTarget.kind === 'arm') {
-      onArmPointChange(dragTarget.index, point)
+      onArmPointChange(dragTarget.index, socketWorldToLocal(font, point, 0))
     }
     if (dragTarget.kind === 'core') {
       onCorePointChange(dragTarget.layer, dragTarget.index, point)
     }
     if (dragTarget.kind === 'socket') {
-      onSocketChange(dragTarget.endpoint, point)
+      onSocketPointChange(dragTarget.socketIndex, dragTarget.endpoint, point)
     }
   }
 
@@ -1230,9 +1450,9 @@ function EditorCanvas({
 
       {mode === 'arms' && (
         <g className="arm-layer">
-          {activeArm.length >= 3 && <polygon className="arm-fill" points={pointsToSvg(activeArm)} />}
-          <polyline className="arm-line" points={pointsToSvg(activeArm)} />
-          {activeArm.map((point, index) => {
+          {activeArmWorld.length >= 3 && <polygon className="arm-fill" points={pointsToSvg(activeArmWorld)} />}
+          <polyline className="arm-line" points={pointsToSvg(activeArmWorld)} />
+          {activeArmWorld.map((point, index) => {
             const locked = index === 0 || index === activeArm.length - 1
             return (
               <circle
@@ -1259,24 +1479,32 @@ function EditorCanvas({
 
       {mode === 'core' && (
         <g className="core-edit-layer">
-          {font.core.polygon.map((point, index) => (
-            <circle
-              key={`${index}-${point.x}-${point.y}`}
-              className={[
-                'handle',
-                'core-handle',
-                selectedCoreLayer === 'outer' && index === selectedCorePoint ? 'selected' : '',
-              ].join(' ')}
-              cx={point.x}
-              cy={point.y}
-              r={2.5}
-              onPointerDown={(event) => {
-                onSelectCoreLayer('outer')
-                onSelectCorePoint(index)
-                startDrag(event, { kind: 'core', layer: 'outer', index })
-              }}
-            />
-          ))}
+          {font.core.customCore &&
+            socketCopies.map((socket, socketIndex) => (
+              <g key={`socket-handles-${socketIndex}`}>
+                {(['start', 'end'] as const).map((endpoint) => {
+                  const point = socket[endpoint]
+                  return (
+                    <circle
+                      key={`socket-${socketIndex}-${endpoint}-${point.x}-${point.y}`}
+                      className={[
+                        'handle',
+                        'socket-handle',
+                        socketIndex === selectedSocketIndex && endpoint === selectedSocketEndpoint ? 'selected' : '',
+                      ].join(' ')}
+                      cx={point.x}
+                      cy={point.y}
+                      r={3}
+                      onPointerDown={(event) => {
+                        onSelectSocketIndex(socketIndex)
+                        onSelectSocketEndpoint(endpoint)
+                        startDrag(event, { kind: 'socket', socketIndex, endpoint })
+                      }}
+                    />
+                  )
+                })}
+              </g>
+            ))}
           {font.core.holes[0]?.map((point, index) => (
             <circle
               key={`hole-${index}-${point.x}-${point.y}`}
@@ -1295,26 +1523,6 @@ function EditorCanvas({
               }}
             />
           ))}
-          <circle
-            className={['handle', 'socket-handle', selectedSocket === 'start' ? 'selected' : ''].join(' ')}
-            cx={font.core.socketStart.x}
-            cy={font.core.socketStart.y}
-            r={3}
-            onPointerDown={(event) => {
-              onSelectSocket('start')
-              startDrag(event, { kind: 'socket', endpoint: 'start' })
-            }}
-          />
-          <circle
-            className={['handle', 'socket-handle', selectedSocket === 'end' ? 'selected' : ''].join(' ')}
-            cx={font.core.socketEnd.x}
-            cy={font.core.socketEnd.y}
-            r={3}
-            onPointerDown={(event) => {
-              onSelectSocket('end')
-              startDrag(event, { kind: 'socket', endpoint: 'end' })
-            }}
-          />
         </g>
       )}
     </svg>
@@ -1344,6 +1552,36 @@ function PointList({ points, selectedIndex, lockedIndexes = [], onSelect }: Poin
           {lockedIndexes.includes(index) && <span className="lock-dot" aria-label="Socket endpoint" />}
         </button>
       ))}
+    </div>
+  )
+}
+
+type SocketListProps = {
+  sockets: SocketSegment[]
+  selectedIndex: number
+  onSelect: (index: number) => void
+}
+
+function SocketList({ sockets, selectedIndex, onSelect }: SocketListProps) {
+  return (
+    <div className="point-list socket-list">
+      {sockets.map((socket, index) => {
+        const center = midpoint(socket.start, socket.end)
+        const length = Math.hypot(socket.end.x - socket.start.x, socket.end.y - socket.start.y)
+        return (
+          <button
+            type="button"
+            key={`${index}-${socket.start.x}-${socket.start.y}-${socket.end.x}-${socket.end.y}`}
+            className={index === selectedIndex ? 'active' : ''}
+            onClick={() => onSelect(index)}
+          >
+            <span>{index}</span>
+            <span>{formatCoord(center.x)}</span>
+            <span>{formatCoord(center.y)}</span>
+            <span>{formatCoord(length)}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -1394,13 +1632,60 @@ function IconButton({ title, disabled = false, children, onClick }: IconButtonPr
   )
 }
 
-function ensureCoreHole(font: GlyphFont) {
-  font.core.holes[0] = font.core.holes[0] ?? structuredClone(DEFAULT_CORE_HOLE)
+function loadActiveSpeciesCore(font: GlyphFont, digitsPerGlyph: number) {
+  const species = getGlyphSpecies(font, digitsPerGlyph)
+  font.defaultSpeciesDigits = digitsPerGlyph
+  font.core = structuredClone(species.core)
+  ensureDraftSpecies(font, digitsPerGlyph)
+}
+
+function saveActiveSpeciesCore(font: GlyphFont, digitsPerGlyph: number) {
+  const species = ensureDraftSpecies(font, digitsPerGlyph)
+  species.core = structuredClone(font.core)
+  species.digitsPerGlyph = digitsPerGlyph
+  species.name = species.name || getSpeciesName(digitsPerGlyph)
+  species.digitOrder = normalizeDigitOrder(species.digitOrder, digitsPerGlyph)
+  font.defaultSpeciesDigits = digitsPerGlyph
+}
+
+function ensureDraftSpecies(font: GlyphFont, digitsPerGlyph: number) {
+  font.species = font.species ?? {}
+  font.species[String(digitsPerGlyph)] = font.species[String(digitsPerGlyph)] ?? {
+    name: getSpeciesName(digitsPerGlyph),
+    digitsPerGlyph,
+    digitOrder: normalizeDigitOrder(null, digitsPerGlyph),
+    core: structuredClone(font.core),
+  }
+  return font.species[String(digitsPerGlyph)]
+}
+
+function isValidDigitOrder(value: string, digitsPerGlyph: number) {
+  if (value.length !== digitsPerGlyph) {
+    return false
+  }
+
+  const seen = new Set(value.split(''))
+  if (seen.size !== digitsPerGlyph) {
+    return false
+  }
+
+  for (let index = 0; index < digitsPerGlyph; index += 1) {
+    if (!seen.has(String(index))) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function ensureCoreHole(font: GlyphFont, thickness: number) {
+  font.core.holes[0] = font.core.holes[0] ?? insetConvexPolygon(font.core.polygon, thickness)
   return font.core.holes[0]
 }
 
 function buildAtlasPage(
   font: GlyphFont,
+  digitsPerGlyph: number,
   page: bigint,
   totalCount: bigint,
   pageSizeNumber: number,
@@ -1422,11 +1707,11 @@ function buildAtlasPage(
     }
 
     const valueIndex = shuffled ? permuteAtlasIndex(slot, totalCount, seed) : slot
-    const value = toPaddedOctal(valueIndex, font.core.digitsPerGlyph)
+    const value = toPaddedOctal(valueIndex, digitsPerGlyph)
     cells.push({
       slot,
       value,
-      render: buildGlyphRender(font, value),
+      render: buildGlyphRender(font, value, digitsPerGlyph),
     })
   }
 
@@ -1712,6 +1997,15 @@ function calculateAtlasLayout(viewport: { width: number; height: number }, cellS
 
 function sanitizeDecimalInput(value: string) {
   return value.replace(/\D/g, '')
+}
+
+function parseNumberInput(value: string) {
+  if (value.trim() === '') {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function octalToDecimalString(value: string) {

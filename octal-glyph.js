@@ -1,4 +1,4 @@
-var OctalGlyphHex = (() => {
+var OctalGlyph = (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2101,11 +2101,14 @@ var OctalGlyphHex = (() => {
     }
   });
 
-  // src/lib/octalGlyphHex.js
-  var octalGlyphHex_exports = {};
-  __export(octalGlyphHex_exports, {
+  // src/lib/octalGlyph.js
+  var octalGlyph_exports = {};
+  __export(octalGlyph_exports, {
     DEFAULT_FONT: () => DEFAULT_FONT,
     DIGIT_KEYS: () => DIGIT_KEYS,
+    SPECIES_DIGIT_COUNTS: () => SPECIES_DIGIT_COUNTS,
+    decimalToOctalString: () => decimalToOctalString,
+    getGlyphSpecies: () => getGlyphSpecies,
     loadFont: () => loadFont,
     normalizeFont: () => normalizeFont,
     render: () => render,
@@ -2116,11 +2119,13 @@ var OctalGlyphHex = (() => {
   });
   var import_polygon_clipping = __toESM(require_polygon_clipping_umd(), 1);
 
-  // fonts/octal-glyph-hex.json
-  var octal_glyph_hex_default = {
+  // fonts/octal-glyph.json
+  var octal_glyph_default = {
     version: "octal-glyph-font/v1",
-    name: "Hex octal glyph font v2",
+    name: "Octal Glyph universal font",
     units: 256,
+    armsCoordinateMode: "socket",
+    defaultSpeciesDigits: 5,
     core: {
       origin: {
         x: 0,
@@ -2136,75 +2141,63 @@ var OctalGlyphHex = (() => {
           y: -41.57
         },
         {
-          x: 32,
-          y: -27.71
+          x: 37.06,
+          y: -20.45
         },
         {
-          x: 40,
-          y: -13.86
+          x: 42.01,
+          y: -5.24
         },
         {
-          x: 40,
-          y: 13.86
+          x: 30.91,
+          y: 28.93
         },
         {
-          x: 32,
-          y: 27.71
+          x: 17.96,
+          y: 38.33
         },
         {
-          x: 8,
-          y: 41.57
+          x: -17.96,
+          y: 38.33
         },
         {
-          x: -8,
-          y: 41.57
+          x: -30.91,
+          y: 28.93
         },
         {
-          x: -32,
-          y: 27.71
+          x: -42.01,
+          y: -5.24
         },
         {
-          x: -40,
-          y: 13.86
-        },
-        {
-          x: -40,
-          y: -13.86
-        },
-        {
-          x: -32,
-          y: -27.71
+          x: -37.06,
+          y: -20.45
         }
       ],
       holes: [
         [
           {
-            x: 8,
-            y: 0
+            x: 27.29,
+            y: -5.24
           },
           {
-            x: 24,
-            y: 0
+            x: 19,
+            y: 20.27
           },
           {
-            x: 24,
-            y: 13.86
+            x: 13.41,
+            y: 24.33
           },
           {
-            x: 0,
-            y: 27.71
+            x: -13.41,
+            y: 24.33
           },
           {
-            x: -24,
-            y: 13.86
+            x: -19,
+            y: 20.27
           },
           {
-            x: -24,
-            y: 0
-          },
-          {
-            x: -8,
-            y: 0
+            x: -27.29,
+            y: -5.24
           }
         ]
       ],
@@ -2216,8 +2209,64 @@ var OctalGlyphHex = (() => {
         x: 8,
         y: -41.57
       },
-      digitsPerGlyph: 6,
-      rotationStepDeg: 60,
+      sockets: [
+        {
+          start: {
+            x: -8,
+            y: -41.57
+          },
+          end: {
+            x: 8,
+            y: -41.57
+          }
+        },
+        {
+          start: {
+            x: 37.06,
+            y: -20.45
+          },
+          end: {
+            x: 42.01,
+            y: -5.24
+          }
+        },
+        {
+          start: {
+            x: 30.91,
+            y: 28.93
+          },
+          end: {
+            x: 17.96,
+            y: 38.33
+          }
+        },
+        {
+          start: {
+            x: -17.96,
+            y: 38.33
+          },
+          end: {
+            x: -30.91,
+            y: 28.93
+          }
+        },
+        {
+          start: {
+            x: -42.01,
+            y: -5.24
+          },
+          end: {
+            x: -37.06,
+            y: -20.45
+          }
+        }
+      ],
+      customCore: false,
+      digitsPerGlyph: 5,
+      rotationStepDeg: 72,
+      socketWidth: 16,
+      coreRadius: 41.57,
+      angleOffsetDeg: 0,
       glyphSpacing: 340
     },
     renderer: {
@@ -2230,192 +2279,1169 @@ var OctalGlyphHex = (() => {
       "0": [
         {
           x: -8,
-          y: -41.57
-        },
-        {
-          x: -0.19,
-          y: -45.95
+          y: 0
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "1": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
-          x: -32,
-          y: -83.14
+          x: -24,
+          y: 27.71
         },
         {
           x: -16,
-          y: -83.14
+          y: 41.57
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "2": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
           x: -8,
-          y: -138.56
+          y: 96.99
         },
         {
           x: 0,
-          y: -152.42
+          y: 110.85
         },
         {
           x: 8,
-          y: -138.56
+          y: 96.99
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "3": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
           x: -40,
-          y: -96.99
+          y: 55.42
         },
         {
           x: -8,
-          y: -152.42
+          y: 110.85
         },
         {
           x: 0,
-          y: -138.56
+          y: 96.99
         },
         {
           x: -24,
-          y: -96.99
+          y: 55.42
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "4": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
           x: 16,
-          y: -83.14
+          y: 41.57
         },
         {
-          x: 32,
-          y: -83.14
+          x: 24,
+          y: 27.71
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "5": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
           x: -40,
-          y: -96.99
+          y: 55.42
         },
         {
-          x: 40,
-          y: -96.99
+          x: 24,
+          y: 55.42
         },
         {
           x: 32,
-          y: -83.14
+          y: 41.57
         },
         {
           x: -16,
-          y: -83.14
+          y: 41.57
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "6": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
           x: -8,
-          y: -180.13
-        },
-        {
-          x: 40,
-          y: -96.99
+          y: 138.56
         },
         {
           x: 32,
-          y: -83.14
+          y: 69.28
+        },
+        {
+          x: 24,
+          y: 55.42
         },
         {
           x: 8,
-          y: -124.71
+          y: 83.14
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ],
       "7": [
         {
           x: -8,
-          y: -41.57
+          y: 0
         },
         {
           x: -40,
-          y: -96.99
+          y: 55.42
         },
         {
           x: 0,
-          y: -166.28
-        },
-        {
-          x: 40,
-          y: -96.99
+          y: 124.71
         },
         {
           x: 32,
-          y: -83.14
+          y: 69.28
+        },
+        {
+          x: 24,
+          y: 55.42
         },
         {
           x: 0,
-          y: -138.56
+          y: 96.99
         },
         {
           x: -24,
-          y: -96.99
+          y: 55.42
         },
         {
           x: 8,
-          y: -41.57
+          y: 0
         }
       ]
+    },
+    species: {
+      "3": {
+        name: "Tripod",
+        digitsPerGlyph: 3,
+        digitOrder: [
+          0,
+          1,
+          2
+        ],
+        core: {
+          origin: {
+            x: 0,
+            y: 0
+          },
+          polygon: [
+            {
+              x: -8,
+              y: -41.57
+            },
+            {
+              x: 8,
+              y: -41.57
+            },
+            {
+              x: 40,
+              y: 13.86
+            },
+            {
+              x: 32,
+              y: 27.71
+            },
+            {
+              x: -32,
+              y: 27.71
+            },
+            {
+              x: -40,
+              y: 13.86
+            }
+          ],
+          holes: [
+            [
+              {
+                x: 0,
+                y: 0
+              },
+              {
+                x: 24,
+                y: 13.86
+              },
+              {
+                x: -24,
+                y: 13.86
+              }
+            ]
+          ],
+          socketStart: {
+            x: -8,
+            y: -41.57
+          },
+          socketEnd: {
+            x: 8,
+            y: -41.57
+          },
+          sockets: [
+            {
+              start: {
+                x: -8,
+                y: -41.57
+              },
+              end: {
+                x: 8,
+                y: -41.57
+              }
+            },
+            {
+              start: {
+                x: 40,
+                y: 13.86
+              },
+              end: {
+                x: 32,
+                y: 27.71
+              }
+            },
+            {
+              start: {
+                x: -32,
+                y: 27.71
+              },
+              end: {
+                x: -40,
+                y: 13.86
+              }
+            }
+          ],
+          customCore: false,
+          digitsPerGlyph: 3,
+          rotationStepDeg: 120,
+          socketWidth: 16,
+          coreRadius: 41.57,
+          angleOffsetDeg: 0,
+          glyphSpacing: 340
+        }
+      },
+      "4": {
+        name: "Tetrapod",
+        digitsPerGlyph: 4,
+        digitOrder: [
+          0,
+          1,
+          2,
+          3
+        ],
+        core: {
+          origin: {
+            x: 0,
+            y: 0
+          },
+          polygon: [
+            {
+              x: -8,
+              y: -41.57
+            },
+            {
+              x: 8,
+              y: -41.57
+            },
+            {
+              x: 41.57,
+              y: -8
+            },
+            {
+              x: 41.57,
+              y: 8
+            },
+            {
+              x: 8,
+              y: 41.57
+            },
+            {
+              x: -8,
+              y: 41.57
+            },
+            {
+              x: -41.57,
+              y: 8
+            },
+            {
+              x: -41.57,
+              y: -8
+            }
+          ],
+          holes: [
+            [
+              {
+                x: 32,
+                y: 0
+              },
+              {
+                x: 4,
+                y: 28
+              },
+              {
+                x: -4,
+                y: 28
+              },
+              {
+                x: -32,
+                y: 0
+              }
+            ]
+          ],
+          socketStart: {
+            x: -8,
+            y: -41.57
+          },
+          socketEnd: {
+            x: 8,
+            y: -41.57
+          },
+          sockets: [
+            {
+              start: {
+                x: -8,
+                y: -41.57
+              },
+              end: {
+                x: 8,
+                y: -41.57
+              }
+            },
+            {
+              start: {
+                x: 41.57,
+                y: -8
+              },
+              end: {
+                x: 41.57,
+                y: 8
+              }
+            },
+            {
+              start: {
+                x: 8,
+                y: 41.57
+              },
+              end: {
+                x: -8,
+                y: 41.57
+              }
+            },
+            {
+              start: {
+                x: -41.57,
+                y: 8
+              },
+              end: {
+                x: -41.57,
+                y: -8
+              }
+            }
+          ],
+          customCore: false,
+          digitsPerGlyph: 4,
+          rotationStepDeg: 90,
+          socketWidth: 16,
+          coreRadius: 41.57,
+          angleOffsetDeg: 0,
+          glyphSpacing: 340
+        }
+      },
+      "5": {
+        name: "Pentapod",
+        digitsPerGlyph: 5,
+        digitOrder: [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        core: {
+          origin: {
+            x: 0,
+            y: 0
+          },
+          polygon: [
+            {
+              x: -8,
+              y: -41.57
+            },
+            {
+              x: 8,
+              y: -41.57
+            },
+            {
+              x: 37.06,
+              y: -20.45
+            },
+            {
+              x: 42.01,
+              y: -5.24
+            },
+            {
+              x: 30.91,
+              y: 28.93
+            },
+            {
+              x: 17.96,
+              y: 38.33
+            },
+            {
+              x: -17.96,
+              y: 38.33
+            },
+            {
+              x: -30.91,
+              y: 28.93
+            },
+            {
+              x: -42.01,
+              y: -5.24
+            },
+            {
+              x: -37.06,
+              y: -20.45
+            }
+          ],
+          holes: [
+            [
+              {
+                x: 27.29,
+                y: -5.24
+              },
+              {
+                x: 19,
+                y: 20.27
+              },
+              {
+                x: 13.41,
+                y: 24.33
+              },
+              {
+                x: -13.41,
+                y: 24.33
+              },
+              {
+                x: -19,
+                y: 20.27
+              },
+              {
+                x: -27.29,
+                y: -5.24
+              }
+            ]
+          ],
+          socketStart: {
+            x: -8,
+            y: -41.57
+          },
+          socketEnd: {
+            x: 8,
+            y: -41.57
+          },
+          sockets: [
+            {
+              start: {
+                x: -8,
+                y: -41.57
+              },
+              end: {
+                x: 8,
+                y: -41.57
+              }
+            },
+            {
+              start: {
+                x: 37.06,
+                y: -20.45
+              },
+              end: {
+                x: 42.01,
+                y: -5.24
+              }
+            },
+            {
+              start: {
+                x: 30.91,
+                y: 28.93
+              },
+              end: {
+                x: 17.96,
+                y: 38.33
+              }
+            },
+            {
+              start: {
+                x: -17.96,
+                y: 38.33
+              },
+              end: {
+                x: -30.91,
+                y: 28.93
+              }
+            },
+            {
+              start: {
+                x: -42.01,
+                y: -5.24
+              },
+              end: {
+                x: -37.06,
+                y: -20.45
+              }
+            }
+          ],
+          customCore: false,
+          digitsPerGlyph: 5,
+          rotationStepDeg: 72,
+          socketWidth: 16,
+          coreRadius: 41.57,
+          angleOffsetDeg: 0,
+          glyphSpacing: 340
+        }
+      },
+      "6": {
+        name: "Hexapod",
+        digitsPerGlyph: 6,
+        digitOrder: [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        core: {
+          origin: {
+            x: 0,
+            y: 0
+          },
+          polygon: [
+            {
+              x: -8,
+              y: -41.57
+            },
+            {
+              x: 8,
+              y: -41.57
+            },
+            {
+              x: 32,
+              y: -27.71
+            },
+            {
+              x: 40,
+              y: -13.86
+            },
+            {
+              x: 40,
+              y: 13.86
+            },
+            {
+              x: 32,
+              y: 27.71
+            },
+            {
+              x: 8,
+              y: 41.57
+            },
+            {
+              x: -8,
+              y: 41.57
+            },
+            {
+              x: -32,
+              y: 27.71
+            },
+            {
+              x: -40,
+              y: 13.86
+            },
+            {
+              x: -40,
+              y: -13.86
+            },
+            {
+              x: -32,
+              y: -27.71
+            }
+          ],
+          holes: [
+            [
+              {
+                x: 24,
+                y: 13.86
+              },
+              {
+                x: 20,
+                y: 20.78
+              },
+              {
+                x: -20,
+                y: 20.78
+              },
+              {
+                x: -24,
+                y: 13.86
+              },
+              {
+                x: 0,
+                y: 0
+              }
+            ]
+          ],
+          socketStart: {
+            x: -8,
+            y: -41.57
+          },
+          socketEnd: {
+            x: 8,
+            y: -41.57
+          },
+          sockets: [
+            {
+              start: {
+                x: -8,
+                y: -41.57
+              },
+              end: {
+                x: 8,
+                y: -41.57
+              }
+            },
+            {
+              start: {
+                x: 32,
+                y: -27.71
+              },
+              end: {
+                x: 40,
+                y: -13.86
+              }
+            },
+            {
+              start: {
+                x: 40,
+                y: 13.86
+              },
+              end: {
+                x: 32,
+                y: 27.71
+              }
+            },
+            {
+              start: {
+                x: 8,
+                y: 41.57
+              },
+              end: {
+                x: -8,
+                y: 41.57
+              }
+            },
+            {
+              start: {
+                x: -32,
+                y: 27.71
+              },
+              end: {
+                x: -40,
+                y: 13.86
+              }
+            },
+            {
+              start: {
+                x: -40,
+                y: -13.86
+              },
+              end: {
+                x: -32,
+                y: -27.71
+              }
+            }
+          ],
+          customCore: false,
+          digitsPerGlyph: 6,
+          rotationStepDeg: 60,
+          socketWidth: 16,
+          coreRadius: 41.57,
+          angleOffsetDeg: 0,
+          glyphSpacing: 340
+        }
+      },
+      "7": {
+        name: "Heptapod",
+        digitsPerGlyph: 7,
+        digitOrder: [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        core: {
+          origin: {
+            x: 0,
+            y: 0
+          },
+          polygon: [
+            {
+              x: -8,
+              y: -41.57
+            },
+            {
+              x: 8,
+              y: -41.57
+            },
+            {
+              x: 27.51,
+              y: -32.17
+            },
+            {
+              x: 37.49,
+              y: -19.66
+            },
+            {
+              x: 42.31,
+              y: 1.45
+            },
+            {
+              x: 38.75,
+              y: 17.05
+            },
+            {
+              x: 25.24,
+              y: 33.98
+            },
+            {
+              x: 10.83,
+              y: 40.92
+            },
+            {
+              x: -10.83,
+              y: 40.92
+            },
+            {
+              x: -25.24,
+              y: 33.98
+            },
+            {
+              x: -38.75,
+              y: 17.05
+            },
+            {
+              x: -42.31,
+              y: 1.45
+            },
+            {
+              x: -37.49,
+              y: -19.66
+            },
+            {
+              x: -27.51,
+              y: -32.17
+            }
+          ],
+          holes: [
+            [
+              {
+                x: 27.95,
+                y: 1.45
+              },
+              {
+                x: 25.81,
+                y: 10.82
+              },
+              {
+                x: 16.29,
+                y: 22.75
+              },
+              {
+                x: 7.63,
+                y: 26.92
+              },
+              {
+                x: -7.63,
+                y: 26.92
+              },
+              {
+                x: -16.29,
+                y: 22.75
+              },
+              {
+                x: -25.81,
+                y: 10.82
+              },
+              {
+                x: -27.95,
+                y: 1.45
+              }
+            ]
+          ],
+          socketStart: {
+            x: -8,
+            y: -41.57
+          },
+          socketEnd: {
+            x: 8,
+            y: -41.57
+          },
+          sockets: [
+            {
+              start: {
+                x: -8,
+                y: -41.57
+              },
+              end: {
+                x: 8,
+                y: -41.57
+              }
+            },
+            {
+              start: {
+                x: 27.51,
+                y: -32.17
+              },
+              end: {
+                x: 37.49,
+                y: -19.66
+              }
+            },
+            {
+              start: {
+                x: 42.31,
+                y: 1.45
+              },
+              end: {
+                x: 38.75,
+                y: 17.05
+              }
+            },
+            {
+              start: {
+                x: 25.24,
+                y: 33.98
+              },
+              end: {
+                x: 10.83,
+                y: 40.92
+              }
+            },
+            {
+              start: {
+                x: -10.83,
+                y: 40.92
+              },
+              end: {
+                x: -25.24,
+                y: 33.98
+              }
+            },
+            {
+              start: {
+                x: -38.75,
+                y: 17.05
+              },
+              end: {
+                x: -42.31,
+                y: 1.45
+              }
+            },
+            {
+              start: {
+                x: -37.49,
+                y: -19.66
+              },
+              end: {
+                x: -27.51,
+                y: -32.17
+              }
+            }
+          ],
+          customCore: false,
+          digitsPerGlyph: 7,
+          rotationStepDeg: 51.42857142857143,
+          socketWidth: 16,
+          coreRadius: 41.57,
+          angleOffsetDeg: 0,
+          glyphSpacing: 340
+        }
+      },
+      "8": {
+        name: "Octapod",
+        digitsPerGlyph: 8,
+        digitOrder: [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        core: {
+          origin: {
+            x: 0,
+            y: 0
+          },
+          polygon: [
+            {
+              x: -8,
+              y: -41.57
+            },
+            {
+              x: 8,
+              y: -41.57
+            },
+            {
+              x: 23.74,
+              y: -35.05
+            },
+            {
+              x: 35.05,
+              y: -23.74
+            },
+            {
+              x: 41.57,
+              y: -8
+            },
+            {
+              x: 41.57,
+              y: 8
+            },
+            {
+              x: 35.05,
+              y: 23.74
+            },
+            {
+              x: 23.74,
+              y: 35.05
+            },
+            {
+              x: 8,
+              y: 41.57
+            },
+            {
+              x: -8,
+              y: 41.57
+            },
+            {
+              x: -23.74,
+              y: 35.05
+            },
+            {
+              x: -35.05,
+              y: 23.74
+            },
+            {
+              x: -41.57,
+              y: 8
+            },
+            {
+              x: -41.57,
+              y: -8
+            },
+            {
+              x: -35.05,
+              y: -23.74
+            },
+            {
+              x: -23.74,
+              y: -35.05
+            }
+          ],
+          holes: [
+            [
+              {
+                x: 27.57,
+                y: 5.22
+              },
+              {
+                x: 23.18,
+                y: 15.81
+              },
+              {
+                x: 15.81,
+                y: 23.18
+              },
+              {
+                x: 5.22,
+                y: 27.57
+              },
+              {
+                x: -5.22,
+                y: 27.57
+              },
+              {
+                x: -15.81,
+                y: 23.18
+              },
+              {
+                x: -23.18,
+                y: 15.81
+              },
+              {
+                x: -27.57,
+                y: 5.22
+              }
+            ]
+          ],
+          socketStart: {
+            x: -8,
+            y: -41.57
+          },
+          socketEnd: {
+            x: 8,
+            y: -41.57
+          },
+          sockets: [
+            {
+              start: {
+                x: -8,
+                y: -41.57
+              },
+              end: {
+                x: 8,
+                y: -41.57
+              }
+            },
+            {
+              start: {
+                x: 23.74,
+                y: -35.05
+              },
+              end: {
+                x: 35.05,
+                y: -23.74
+              }
+            },
+            {
+              start: {
+                x: 41.57,
+                y: -8
+              },
+              end: {
+                x: 41.57,
+                y: 8
+              }
+            },
+            {
+              start: {
+                x: 35.05,
+                y: 23.74
+              },
+              end: {
+                x: 23.74,
+                y: 35.05
+              }
+            },
+            {
+              start: {
+                x: 8,
+                y: 41.57
+              },
+              end: {
+                x: -8,
+                y: 41.57
+              }
+            },
+            {
+              start: {
+                x: -23.74,
+                y: 35.05
+              },
+              end: {
+                x: -35.05,
+                y: 23.74
+              }
+            },
+            {
+              start: {
+                x: -41.57,
+                y: 8
+              },
+              end: {
+                x: -41.57,
+                y: -8
+              }
+            },
+            {
+              start: {
+                x: -35.05,
+                y: -23.74
+              },
+              end: {
+                x: -23.74,
+                y: -35.05
+              }
+            }
+          ],
+          customCore: false,
+          digitsPerGlyph: 8,
+          rotationStepDeg: 45,
+          socketWidth: 16,
+          coreRadius: 41.57,
+          angleOffsetDeg: 0,
+          glyphSpacing: 340
+        }
+      }
     }
   };
 
-  // src/lib/octalGlyphHex.js
+  // src/lib/octalGlyph.js
   var DIGIT_KEYS = ["0", "1", "2", "3", "4", "5", "6", "7"];
+  var SPECIES_DIGIT_COUNTS = [3, 4, 5, 6, 7, 8];
+  var MIN_CORE_DIGITS = 3;
+  var MAX_CORE_DIGITS = 32;
+  var DEFAULT_SOCKET_WIDTH = 16;
+  var DEFAULT_CORE_RADIUS = 41.57;
+  var DEFAULT_ANGLE_OFFSET_DEG = 0;
   var DEFAULT_BOUNDS = {
     minX: -90,
     minY: -180,
@@ -2424,31 +3450,40 @@ var OctalGlyphHex = (() => {
     width: 180,
     height: 270
   };
-  var DEFAULT_FONT = normalizeFont(octal_glyph_hex_default);
+  var SPECIES_NAMES = {
+    3: "Tripod",
+    4: "Tetrapod",
+    5: "Pentapod",
+    6: "Hexapod",
+    7: "Heptapod",
+    8: "Octapod"
+  };
+  var DEFAULT_FONT = normalizeFont(octal_glyph_default);
   function render(value, options = {}) {
     const font = normalizeFont(options.font ?? DEFAULT_FONT);
-    const input = valueToOctalString(value);
+    const species = getGlyphSpecies(font, options.digitsPerGlyph);
+    const renderFont = { ...font, core: species.core };
+    const input = valueToOctalString(value, options.inputBase ?? "octal");
     const precision = numberOr(options.precision, font.renderer.precision);
-    const chunks = splitOctalChunks(input, font.core.digitsPerGlyph);
+    const chunks = splitOctalChunks(input, species.digitsPerGlyph);
     const polygons = [];
     chunks.forEach((chunk, stackIndex) => {
-      const yOffset = stackIndex * font.core.glyphSpacing;
+      const yOffset = stackIndex * species.core.glyphSpacing;
       const coreRing = pointListToRing(
-        font.core.polygon.map((point) => translatePoint(point, 0, yOffset)),
+        species.core.polygon.map((point) => translatePoint(point, 0, yOffset)),
         precision
       );
-      const coreHoles = font.core.holes.map((hole) => pointListToRing(hole.map((point) => translatePoint(point, 0, yOffset)), precision)).filter((ring) => ring.length >= 3);
+      const coreHoles = species.core.holes.map((hole) => pointListToRing(hole.map((point) => translatePoint(point, 0, yOffset)), precision)).filter((ring) => ring.length >= 3);
       if (coreRing.length >= 3) {
         polygons.push([coreRing, ...coreHoles]);
       }
-      chunk.digitsLsbFirst.forEach((digit, socketIndex) => {
-        const arm = alignArmEndpoints(font, font.arms[digit] ?? []);
+      getSocketDigits(chunk.padded, species.digitOrder).forEach((digit, socketIndex) => {
+        const arm = armToWorldPoints(renderFont, font.arms[digit] ?? [], socketIndex);
         if (arm.length < 3) {
           return;
         }
-        const rotation = socketIndex * font.core.rotationStepDeg;
         const armRing = pointListToRing(
-          arm.map((point) => translatePoint(rotatePoint(point, rotation, font.core.origin), 0, yOffset)),
+          arm.map((point) => translatePoint(point, 0, yOffset)),
           precision
         );
         if (armRing.length >= 3) {
@@ -2460,7 +3495,7 @@ var OctalGlyphHex = (() => {
     const paddingGridSize = numberOr(options.gridSize, font.renderer.gridSize);
     const paddingCells = numberOr(options.paddingCells, font.renderer.paddingCells);
     const padding = numberOr(options.padding, paddingGridSize * paddingCells);
-    const bounds = getStackedGlyphFrameBounds(font, chunks.length, padding, paddingGridSize);
+    const bounds = getStackedGlyphFrameBounds(renderFont, chunks.length, padding, paddingGridSize);
     const fill = stringOr(options.fill, font.renderer.fill);
     const path = multiPolygonToPath(multiPolygon, precision);
     const viewBox = boundsToViewBox(bounds, 0, precision);
@@ -2495,33 +3530,164 @@ var OctalGlyphHex = (() => {
     const font = await loadFont(fontSource);
     return renderSvg(value, { ...options, font });
   }
+  function getSpeciesName(digitsPerGlyph) {
+    return SPECIES_NAMES[digitsPerGlyph] ?? `${digitsPerGlyph}-pod`;
+  }
+  function buildDefaultDigitOrder(digitsPerGlyph) {
+    const size = clampInteger(digitsPerGlyph, MIN_CORE_DIGITS, MAX_CORE_DIGITS);
+    return Array.from({ length: size }, (_, index) => size - 1 - index);
+  }
+  function normalizeDigitOrder(rawOrder, digitsPerGlyph) {
+    const fallback = buildDefaultDigitOrder(digitsPerGlyph);
+    if (Array.isArray(rawOrder)) {
+      const normalized = rawOrder.map((value) => typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : Number.NaN).filter((value) => Number.isInteger(value) && value >= 0 && value < digitsPerGlyph);
+      return normalized.length === digitsPerGlyph ? normalized : fallback;
+    }
+    if (typeof rawOrder === "string") {
+      const compact = rawOrder.replace(/\s+/g, "");
+      const normalized = compact.split("").map((value) => Number.parseInt(value, 10));
+      if (normalized.length === digitsPerGlyph && normalized.every((value) => Number.isInteger(value) && value >= 0 && value < digitsPerGlyph)) {
+        return normalized;
+      }
+    }
+    return fallback;
+  }
+  function getSocketDigits(paddedValue, digitOrder) {
+    return digitOrder.map((digitIndex) => {
+      const digit = paddedValue[digitIndex];
+      return DIGIT_KEYS.includes(digit) ? digit : "0";
+    });
+  }
+  function normalizeCoreGeometry(rawCoreInput, fallbackCoreInput) {
+    const rawCore = isRecord(rawCoreInput) ? rawCoreInput : {};
+    const fallbackCore = isRecord(fallbackCoreInput) ? fallbackCoreInput : {};
+    const origin = pointOr(rawCore.origin, fallbackCore.origin, { x: 0, y: 0 });
+    const rawSocketStart = isPoint(rawCore.socketStart) ? rawCore.socketStart : null;
+    const rawSocketEnd = isPoint(rawCore.socketEnd) ? rawCore.socketEnd : null;
+    const rawSockets = isSocketArray(rawCore.sockets) ? rawCore.sockets : [];
+    const fallbackSocketStart = isPoint(fallbackCore.socketStart) ? fallbackCore.socketStart : null;
+    const fallbackSocketEnd = isPoint(fallbackCore.socketEnd) ? fallbackCore.socketEnd : null;
+    const digitsPerGlyph = clampInteger(
+      numberOr(rawCore.digitsPerGlyph, numberOr(fallbackCore.digitsPerGlyph, 7)),
+      MIN_CORE_DIGITS,
+      MAX_CORE_DIGITS
+    );
+    const generatedCore = createRegularCoreGeometry({
+      origin,
+      digitsPerGlyph,
+      socketWidth: numberOr(
+        rawCore.socketWidth,
+        rawSocketStart && rawSocketEnd ? inferSocketWidth(rawSocketStart, rawSocketEnd) : numberOr(
+          fallbackCore.socketWidth,
+          fallbackSocketStart && fallbackSocketEnd ? inferSocketWidth(fallbackSocketStart, fallbackSocketEnd) : DEFAULT_SOCKET_WIDTH
+        )
+      ),
+      coreRadius: numberOr(
+        rawCore.coreRadius,
+        rawSocketStart && rawSocketEnd ? inferCoreRadius(origin, rawSocketStart, rawSocketEnd) : numberOr(
+          fallbackCore.coreRadius,
+          fallbackSocketStart && fallbackSocketEnd ? inferCoreRadius(origin, fallbackSocketStart, fallbackSocketEnd) : DEFAULT_CORE_RADIUS
+        )
+      ),
+      angleOffsetDeg: numberOr(
+        rawCore.angleOffsetDeg,
+        rawSocketStart && rawSocketEnd ? inferAngleOffsetDeg(origin, rawSocketStart, rawSocketEnd) : numberOr(
+          fallbackCore.angleOffsetDeg,
+          fallbackSocketStart && fallbackSocketEnd ? inferAngleOffsetDeg(origin, fallbackSocketStart, fallbackSocketEnd) : DEFAULT_ANGLE_OFFSET_DEG
+        )
+      )
+    });
+    const customCore = rawCore.customCore === true;
+    const sockets = customCore ? normalizeSockets(rawSockets, generatedCore.sockets, digitsPerGlyph) : generatedCore.sockets;
+    const polygon = customCore ? socketsToPolygon(sockets) : generatedCore.polygon;
+    return {
+      ...fallbackCore,
+      ...rawCore,
+      origin,
+      polygon,
+      holes: pointArrayListOr(rawCore.holes, fallbackCore.holes, []),
+      socketStart: sockets[0]?.start ?? generatedCore.socketStart,
+      socketEnd: sockets[0]?.end ?? generatedCore.socketEnd,
+      sockets,
+      customCore,
+      digitsPerGlyph: generatedCore.digitsPerGlyph,
+      rotationStepDeg: generatedCore.rotationStepDeg,
+      socketWidth: generatedCore.socketWidth,
+      coreRadius: generatedCore.coreRadius,
+      angleOffsetDeg: generatedCore.angleOffsetDeg,
+      glyphSpacing: numberOr(rawCore.glyphSpacing, numberOr(fallbackCore.glyphSpacing, 340))
+    };
+  }
+  function normalizeSpeciesMap(rawSpeciesInput, fallbackSpeciesInput, baseCore) {
+    const rawSpecies = isRecord(rawSpeciesInput) ? rawSpeciesInput : {};
+    const fallbackSpecies = isRecord(fallbackSpeciesInput) ? fallbackSpeciesInput : {};
+    const normalized = {};
+    const keys = /* @__PURE__ */ new Set([...SPECIES_DIGIT_COUNTS.map(String), ...Object.keys(fallbackSpecies), ...Object.keys(rawSpecies)]);
+    keys.forEach((key) => {
+      const rawEntry = isRecord(rawSpecies[key]) ? rawSpecies[key] : {};
+      const fallbackEntry = isRecord(fallbackSpecies[key]) ? fallbackSpecies[key] : {};
+      const fallbackDigits = clampInteger(Number.parseInt(key, 10), MIN_CORE_DIGITS, MAX_CORE_DIGITS);
+      const fallbackCore = normalizeCoreGeometry(
+        fallbackEntry.core,
+        fallbackDigits === baseCore.digitsPerGlyph ? baseCore : {
+          ...baseCore,
+          digitsPerGlyph: fallbackDigits,
+          holes: []
+        }
+      );
+      const core = normalizeCoreGeometry(rawEntry.core, fallbackCore);
+      normalized[String(core.digitsPerGlyph)] = {
+        name: typeof rawEntry.name === "string" ? rawEntry.name : typeof fallbackEntry.name === "string" ? fallbackEntry.name : getSpeciesName(core.digitsPerGlyph),
+        digitsPerGlyph: core.digitsPerGlyph,
+        digitOrder: normalizeDigitOrder(rawEntry.digitOrder ?? fallbackEntry.digitOrder, core.digitsPerGlyph),
+        core
+      };
+    });
+    if (Object.keys(normalized).length === 0) {
+      normalized[String(baseCore.digitsPerGlyph)] = {
+        name: getSpeciesName(baseCore.digitsPerGlyph),
+        digitsPerGlyph: baseCore.digitsPerGlyph,
+        digitOrder: buildDefaultDigitOrder(baseCore.digitsPerGlyph),
+        core: baseCore
+      };
+    }
+    if (!normalized[String(baseCore.digitsPerGlyph)]) {
+      normalized[String(baseCore.digitsPerGlyph)] = {
+        name: getSpeciesName(baseCore.digitsPerGlyph),
+        digitsPerGlyph: baseCore.digitsPerGlyph,
+        digitOrder: buildDefaultDigitOrder(baseCore.digitsPerGlyph),
+        core: baseCore
+      };
+    }
+    return normalized;
+  }
+  function getGlyphSpecies(fontInput, digitsPerGlyph = fontInput.defaultSpeciesDigits ?? fontInput.core.digitsPerGlyph) {
+    const font = normalizeFont(fontInput);
+    const digits = clampInteger(digitsPerGlyph, MIN_CORE_DIGITS, MAX_CORE_DIGITS);
+    return font.species[String(digits)] ?? {
+      name: getSpeciesName(digits),
+      digitsPerGlyph: digits,
+      digitOrder: buildDefaultDigitOrder(digits),
+      core: normalizeCoreGeometry({ digitsPerGlyph: digits, holes: [] }, { ...font.core, holes: [] })
+    };
+  }
   function normalizeFont(rawInput = {}) {
-    const fallback = typeof octal_glyph_hex_default === "object" ? octal_glyph_hex_default : {};
+    const fallback = typeof octal_glyph_default === "object" ? octal_glyph_default : {};
     const raw = isRecord(rawInput) ? rawInput : {};
-    const rawCore = isRecord(raw.core) ? raw.core : {};
     const rawArms = isRecord(raw.arms) ? raw.arms : {};
     const rawRenderer = isRecord(raw.renderer) ? raw.renderer : {};
-    const fallbackCore = isRecord(fallback.core) ? fallback.core : {};
     const fallbackRenderer = isRecord(fallback.renderer) ? fallback.renderer : {};
     const fallbackArms = isRecord(fallback.arms) ? fallback.arms : {};
+    const fallbackCore = isRecord(fallback.core) ? normalizeCoreGeometry(fallback.core, {}) : normalizeCoreGeometry({}, {});
+    const rawCore = isRecord(raw.core) ? raw.core : {};
+    const baseCore = normalizeCoreGeometry(rawCore, fallbackCore);
     const font = {
       version: "octal-glyph-font/v1",
-      name: typeof raw.name === "string" ? raw.name : stringOr(fallback.name, "Hex octal glyph font"),
+      name: typeof raw.name === "string" ? raw.name : stringOr(fallback.name, "Octal Glyph font"),
       units: numberOr(raw.units, numberOr(fallback.units, 256)),
-      core: {
-        origin: pointOr(rawCore.origin, fallbackCore.origin, { x: 0, y: 0 }),
-        polygon: pointArrayOr(rawCore.polygon, fallbackCore.polygon, []),
-        holes: pointArrayListOr(rawCore.holes, fallbackCore.holes, []),
-        socketStart: pointOr(rawCore.socketStart, fallbackCore.socketStart, { x: -8, y: -41.57 }),
-        socketEnd: pointOr(rawCore.socketEnd, fallbackCore.socketEnd, { x: 8, y: -41.57 }),
-        digitsPerGlyph: clampInteger(
-          numberOr(rawCore.digitsPerGlyph, numberOr(fallbackCore.digitsPerGlyph, 6)),
-          1,
-          32
-        ),
-        rotationStepDeg: numberOr(rawCore.rotationStepDeg, numberOr(fallbackCore.rotationStepDeg, 60)),
-        glyphSpacing: numberOr(rawCore.glyphSpacing, numberOr(fallbackCore.glyphSpacing, 340))
-      },
+      armsCoordinateMode: "socket",
+      defaultSpeciesDigits: clampInteger(numberOr(raw.defaultSpeciesDigits, baseCore.digitsPerGlyph), MIN_CORE_DIGITS, MAX_CORE_DIGITS),
+      core: baseCore,
       renderer: {
         fill: stringOr(rawRenderer.fill, stringOr(fallbackRenderer.fill, "#000000")),
         gridSize: numberOr(rawRenderer.gridSize, numberOr(fallbackRenderer.gridSize, 8)),
@@ -2531,15 +3697,91 @@ var OctalGlyphHex = (() => {
         ),
         precision: numberOr(rawRenderer.precision, numberOr(fallbackRenderer.precision, 2))
       },
+      species: normalizeSpeciesMap(raw.species, fallback.species, baseCore),
       arms: {}
     };
+    const defaultSpecies = font.species[String(font.defaultSpeciesDigits)] ?? font.species[String(baseCore.digitsPerGlyph)];
+    if (defaultSpecies) {
+      font.defaultSpeciesDigits = defaultSpecies.digitsPerGlyph;
+      font.core = defaultSpecies.core;
+    }
+    const armsAreSocketLocal = raw.armsCoordinateMode === "socket";
     DIGIT_KEYS.forEach((digit) => {
-      const sourceArm = isPointArray(rawArms[digit]) ? rawArms[digit] : fallbackArms[digit];
-      font.arms[digit] = alignArmEndpoints(font, isPointArray(sourceArm) ? sourceArm : []);
+      const hasRawArm = isPointArray(rawArms[digit]);
+      const sourceArm = hasRawArm ? rawArms[digit] : fallbackArms[digit];
+      const safeArm = isPointArray(sourceArm) ? sourceArm : [];
+      const localArm = hasRawArm && !armsAreSocketLocal ? safeArm.map((point) => socketWorldToLocal(font, point, 0)) : safeArm;
+      font.arms[digit] = alignArmEndpoints(font, localArm);
     });
     return font;
   }
-  function valueToOctalString(value) {
+  function createRegularCoreGeometry(input) {
+    const digitsPerGlyph = clampInteger(input.digitsPerGlyph, MIN_CORE_DIGITS, MAX_CORE_DIGITS);
+    const coreRadius = Math.max(0.01, input.coreRadius);
+    const maxSocketWidth = Math.max(0.01, 2 * coreRadius * Math.tan(Math.PI / digitsPerGlyph) * 0.98);
+    const socketWidth = Math.min(Math.max(0.01, input.socketWidth), maxSocketWidth);
+    const angleOffsetDeg = normalizeDegrees(input.angleOffsetDeg);
+    const rotationStepDeg = 360 / digitsPerGlyph;
+    const baseStart = { x: input.origin.x - socketWidth / 2, y: input.origin.y - coreRadius };
+    const baseEnd = { x: input.origin.x + socketWidth / 2, y: input.origin.y - coreRadius };
+    const socketStart = roundPoint(rotatePoint(baseStart, angleOffsetDeg, input.origin));
+    const socketEnd = roundPoint(rotatePoint(baseEnd, angleOffsetDeg, input.origin));
+    const sockets = [];
+    for (let socketIndex = 0; socketIndex < digitsPerGlyph; socketIndex += 1) {
+      const rotation = angleOffsetDeg + socketIndex * rotationStepDeg;
+      sockets.push({
+        start: roundPoint(rotatePoint(baseStart, rotation, input.origin)),
+        end: roundPoint(rotatePoint(baseEnd, rotation, input.origin))
+      });
+    }
+    return {
+      polygon: socketsToPolygon(sockets),
+      socketStart,
+      socketEnd,
+      sockets,
+      customCore: false,
+      digitsPerGlyph,
+      rotationStepDeg,
+      socketWidth,
+      coreRadius,
+      angleOffsetDeg
+    };
+  }
+  function socketsToPolygon(sockets) {
+    return sockets.flatMap((socket) => [socket.start, socket.end]);
+  }
+  function normalizeSockets(sockets, fallback, digitsPerGlyph) {
+    return Array.from({ length: digitsPerGlyph }, (_, index) => {
+      const socket = sockets[index] ?? fallback[index] ?? fallback[0];
+      return {
+        start: roundPoint(socket?.start ?? { x: 0, y: 0 }),
+        end: roundPoint(socket?.end ?? { x: 0, y: 0 })
+      };
+    });
+  }
+  function inferSocketWidth(socketStart, socketEnd) {
+    return Math.max(0.01, Math.hypot(socketStart.x - socketEnd.x, socketStart.y - socketEnd.y));
+  }
+  function inferCoreRadius(origin, socketStart, socketEnd) {
+    const center = {
+      x: (socketStart.x + socketEnd.x) / 2,
+      y: (socketStart.y + socketEnd.y) / 2
+    };
+    return Math.max(0.01, Math.hypot(center.x - origin.x, center.y - origin.y));
+  }
+  function inferAngleOffsetDeg(origin, socketStart, socketEnd) {
+    const center = {
+      x: (socketStart.x + socketEnd.x) / 2,
+      y: (socketStart.y + socketEnd.y) / 2
+    };
+    const dx = center.x - origin.x;
+    const dy = center.y - origin.y;
+    if (dx === 0 && dy === 0) {
+      return DEFAULT_ANGLE_OFFSET_DEG;
+    }
+    return normalizeDegrees(Math.atan2(dy, dx) * 180 / Math.PI + 90);
+  }
+  function decimalToOctalString(value) {
     if (typeof value === "bigint") {
       if (value < 0n) {
         throw new Error("Octal glyph values must be non-negative.");
@@ -2552,8 +3794,21 @@ var OctalGlyphHex = (() => {
       }
       return Math.trunc(value).toString(8);
     }
-    const cleaned = String(value ?? "0").replace(/\s+/g, "").replace(/[^0-7]/g, "");
-    return cleaned || "0";
+    const cleaned = String(value ?? "0").replace(/\s+/g, "");
+    if (!/^\d+$/.test(cleaned)) {
+      throw new Error("Decimal glyph values must contain only digits 0-9.");
+    }
+    return BigInt(cleaned || "0").toString(8);
+  }
+  function valueToOctalString(value, inputBase = "octal") {
+    if (typeof value === "string") {
+      if (inputBase === "decimal") {
+        return decimalToOctalString(value);
+      }
+      const cleaned = value.replace(/\s+/g, "").replace(/[^0-7]/g, "");
+      return cleaned || "0";
+    }
+    return decimalToOctalString(value);
   }
   function splitOctalChunks(value, digitsPerGlyph) {
     const clean = valueToOctalString(value);
@@ -2572,13 +3827,67 @@ var OctalGlyphHex = (() => {
     return chunks;
   }
   function alignArmEndpoints(font, points) {
+    const halfWidth = font.core.socketWidth / 2;
+    const start = { x: -halfWidth, y: 0 };
+    const end = { x: halfWidth, y: 0 };
     if (!Array.isArray(points) || points.length < 2) {
-      return [clone(font.core.socketStart), clone(font.core.socketEnd)];
+      return [start, end];
     }
     const next = points.map((point) => ({ ...point }));
-    next[0] = clone(font.core.socketStart);
-    next[next.length - 1] = clone(font.core.socketEnd);
+    next[0] = start;
+    next[next.length - 1] = end;
     return next;
+  }
+  function getSocketSegment(font, socketIndex) {
+    const socket = font.core.sockets[socketIndex];
+    if (socket) {
+      return socket;
+    }
+    const rotation = socketIndex * font.core.rotationStepDeg;
+    return {
+      start: rotatePoint(font.core.socketStart, rotation, font.core.origin),
+      end: rotatePoint(font.core.socketEnd, rotation, font.core.origin)
+    };
+  }
+  function getSocketFrame(font, socketIndex) {
+    const segment = getSocketSegment(font, socketIndex);
+    const center = midpoint(segment.start, segment.end);
+    const dx = segment.end.x - segment.start.x;
+    const dy = segment.end.y - segment.start.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const tangent = { x: dx / length, y: dy / length };
+    const centerVector = { x: center.x - font.core.origin.x, y: center.y - font.core.origin.y };
+    let outward = { x: tangent.y, y: -tangent.x };
+    if (outward.x * centerVector.x + outward.y * centerVector.y < 0) {
+      outward = { x: -outward.x, y: -outward.y };
+    }
+    return { segment, center, tangent, outward, length };
+  }
+  function socketLocalToWorld(font, point, socketIndex) {
+    const frame = getSocketFrame(font, socketIndex);
+    return {
+      x: frame.center.x + frame.tangent.x * point.x + frame.outward.x * point.y,
+      y: frame.center.y + frame.tangent.y * point.x + frame.outward.y * point.y
+    };
+  }
+  function socketWorldToLocal(font, point, socketIndex) {
+    const frame = getSocketFrame(font, socketIndex);
+    const dx = point.x - frame.center.x;
+    const dy = point.y - frame.center.y;
+    return {
+      x: round(dx * frame.tangent.x + dy * frame.tangent.y),
+      y: round(dx * frame.outward.x + dy * frame.outward.y)
+    };
+  }
+  function armToWorldPoints(font, points, socketIndex) {
+    const frame = getSocketFrame(font, socketIndex);
+    const arm = alignArmEndpoints(font, points);
+    const next = arm.map((point) => ({ ...point }));
+    if (next.length >= 2) {
+      next[0] = { x: -frame.length / 2, y: 0 };
+      next[next.length - 1] = { x: frame.length / 2, y: 0 };
+    }
+    return next.map((point) => socketLocalToWorld(font, point, socketIndex));
   }
   function rotatePoint(point, degrees, origin) {
     const radians = degrees * Math.PI / 180;
@@ -2631,10 +3940,9 @@ var OctalGlyphHex = (() => {
       font.core.socketEnd
     ];
     for (let socketIndex = 0; socketIndex < font.core.digitsPerGlyph; socketIndex += 1) {
-      const rotation = socketIndex * font.core.rotationStepDeg;
       DIGIT_KEYS.forEach((digit) => {
-        alignArmEndpoints(font, font.arms[digit] ?? []).forEach((point) => {
-          points.push(rotatePoint(point, rotation, origin));
+        armToWorldPoints(font, font.arms[digit] ?? [], socketIndex).forEach((point) => {
+          points.push(point);
         });
       });
     }
@@ -2671,6 +3979,12 @@ var OctalGlyphHex = (() => {
       maxY,
       width: maxX - minX,
       height: maxY - minY
+    };
+  }
+  function midpoint(a, b) {
+    return {
+      x: (a.x + b.x) / 2,
+      y: (a.y + b.y) / 2
     };
   }
   function maxDistanceFromOrigin(bounds, origin, axis) {
@@ -2779,9 +4093,21 @@ var OctalGlyphHex = (() => {
   function round(value) {
     return Number.parseFloat(value.toFixed(6));
   }
+  function roundPoint(point) {
+    return {
+      x: roundForGeometry(point.x),
+      y: roundForGeometry(point.y)
+    };
+  }
+  function roundForGeometry(value) {
+    return Number.parseFloat(value.toFixed(2));
+  }
   function roundForBoolean(value, precision) {
     const digits = Math.max(0, Math.min(6, Math.round(precision)));
     return Number.parseFloat(value.toFixed(digits));
+  }
+  function normalizeDegrees(value) {
+    return (value % 360 + 360) % 360;
   }
   function clampInteger(value, min, max) {
     return Math.max(min, Math.min(max, Math.round(value)));
@@ -2804,20 +4130,17 @@ var OctalGlyphHex = (() => {
   function isPointArrayList(value) {
     return Array.isArray(value) && value.every(isPointArray);
   }
+  function isSocketSegment(value) {
+    return isRecord(value) && isPoint(value.start) && isPoint(value.end);
+  }
+  function isSocketArray(value) {
+    return Array.isArray(value) && value.every(isSocketSegment);
+  }
   function pointOr(value, fallback, defaultValue) {
     if (isPoint(value)) {
       return clone(value);
     }
     if (isPoint(fallback)) {
-      return clone(fallback);
-    }
-    return clone(defaultValue);
-  }
-  function pointArrayOr(value, fallback, defaultValue) {
-    if (isPointArray(value)) {
-      return clone(value);
-    }
-    if (isPointArray(fallback)) {
       return clone(fallback);
     }
     return clone(defaultValue);
@@ -2837,7 +4160,7 @@ var OctalGlyphHex = (() => {
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
-  return __toCommonJS(octalGlyphHex_exports);
+  return __toCommonJS(octalGlyph_exports);
 })();
 /*! Bundled license information:
 
@@ -2865,4 +4188,4 @@ polygon-clipping/dist/polygon-clipping.umd.js:
       and limitations under the License.
       ***************************************************************************** *)
 */
-globalThis.OctalGlyphHex = OctalGlyphHex; if (typeof module !== 'undefined' && module.exports) module.exports = OctalGlyphHex;
+globalThis.OctalGlyph = OctalGlyph; if (typeof module !== 'undefined' && module.exports) module.exports = OctalGlyph;
