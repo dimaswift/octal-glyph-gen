@@ -197,7 +197,7 @@ select:disabled {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(260px, 330px) minmax(390px, 1fr) minmax(300px, 390px);
+  grid-template-columns: minmax(260px, 330px) minmax(320px, 0.7fr) minmax(540px, 1.3fr);
   gap: 16px;
   padding: 16px;
   min-height: calc(100svh - 76px);
@@ -264,7 +264,7 @@ select:disabled {
 }
 
 .output-tabs {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .tabs button,
@@ -597,6 +597,80 @@ select:disabled {
 .preview-frame svg {
   width: min(82%, 260px);
   height: 240px;
+  overflow: visible;
+}
+
+.writing-tool,
+.writing-input,
+.writing-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.writing-input span,
+.writing-controls span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.writing-input textarea {
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--input-bg);
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.writing-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.writing-controls label {
+  display: grid;
+  gap: 5px;
+}
+
+.writing-controls input {
+  min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  color: var(--ink);
+  background: var(--input-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 0 9px;
+}
+
+.writing-preview {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(45deg, var(--checker) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--checker) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--checker) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--checker) 75%),
+    var(--surface);
+  background-position:
+    0 0,
+    0 10px,
+    10px -10px,
+    -10px 0;
+  background-size: 20px 20px;
+}
+
+.writing-preview svg {
+  width: max(100%, 320px);
+  max-height: 360px;
   overflow: visible;
 }
 

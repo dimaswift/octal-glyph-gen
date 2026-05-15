@@ -60,7 +60,7 @@ import {
 type EditorMode = 'arms' | 'core'
 type CoreLayer = 'outer' | 'hole'
 type GridMode = 'square' | 'diagonal' | 'triangular'
-type OutputMode = 'preview' | 'atlas'
+type OutputMode = 'preview' | 'writer' | 'atlas'
 type AtlasOrder = 'ordered' | 'shuffled'
 type Theme = 'light' | 'dark'
 type SocketEndpoint = 'start' | 'end'
@@ -74,6 +74,7 @@ const VIEWBOX_EXTENT = 180
 const ATLAS_GAP = 8
 const DEFAULT_ATLAS_CELL_SIZE = 112
 const DEFAULT_RING_THICKNESS = 14
+const DEFAULT_WRITING_INPUT = '751-512 525'
 
 function App() {
   const [font, setFont] = useState<GlyphFont>(() => cloneDefaultFont())
@@ -98,6 +99,11 @@ function App() {
   const [atlasPage, setAtlasPage] = useState(0n)
   const [atlasCellSize, setAtlasCellSize] = useState(DEFAULT_ATLAS_CELL_SIZE)
   const [showAtlasLabels, setShowAtlasLabels] = useState(true)
+  const [writingInput, setWritingInput] = useState(DEFAULT_WRITING_INPUT)
+  const [writingGlyphSize, setWritingGlyphSize] = useState(104)
+  const [writingWordSpacing, setWritingWordSpacing] = useState(8)
+  const [writingSentenceSpacing, setWritingSentenceSpacing] = useState(36)
+  const [writingLineSpacing, setWritingLineSpacing] = useState(38)
   const [theme, setTheme] = useState<Theme>('light')
   const [viewport, setViewport] = useState(getInitialViewport)
   const [status, setStatus] = useState('Ready')
@@ -117,6 +123,10 @@ function App() {
   const digitOrderInput =
     digitOrderDraft?.digitsPerGlyph === selectedSpeciesDigits ? digitOrderDraft.value : activeDigitOrderText
   const renderResult = useMemo(() => buildGlyphRender(font, octalInput, selectedSpeciesDigits), [font, octalInput, selectedSpeciesDigits])
+  const writingRender = useMemo(
+    () => buildWritingRender(font, writingInput, writingGlyphSize, writingWordSpacing, writingSentenceSpacing, writingLineSpacing),
+    [font, writingGlyphSize, writingInput, writingLineSpacing, writingSentenceSpacing, writingWordSpacing],
+  )
   const renderPadding = useMemo(() => getRenderPadding(activeFont), [activeFont])
   const atlasLayout = useMemo(() => calculateAtlasLayout(viewport, atlasCellSize), [atlasCellSize, viewport])
   const atlasPageSize = BigInt(atlasLayout.pageSize)
@@ -885,6 +895,16 @@ function App() {
             </button>
             <button
               type="button"
+              className={outputMode === 'writer' ? 'active' : ''}
+              onClick={() => {
+                setOutputMode('writer')
+                setIsAtlasOpen(false)
+              }}
+            >
+              Writer
+            </button>
+            <button
+              type="button"
               className={outputMode === 'atlas' ? 'active' : ''}
               onClick={() => openAtlas()}
             >
@@ -908,6 +928,23 @@ function App() {
                 <span>{font.renderer.paddingCells} pad cells</span>
               </div>
             </>
+          ) : outputMode === 'writer' ? (
+            <WritingTool
+              fill={font.renderer.fill}
+              glyphSize={writingGlyphSize}
+              lineSpacing={writingLineSpacing}
+              input={writingInput}
+              render={writingRender}
+              onGlyphSizeChange={setWritingGlyphSize}
+              onInputChange={(value) => setWritingInput(normalizeWritingInput(value))}
+              onLineSpacingChange={setWritingLineSpacing}
+              onSentenceSpacingChange={setWritingSentenceSpacing}
+              onWordSpacingChange={setWritingWordSpacing}
+              onCopySvg={() => copyText(writingRender.svg, 'Writing SVG')}
+              onExportSvg={() => downloadText(writingRender.svg, 'octal-writing.svg', 'image/svg+xml')}
+              sentenceSpacing={writingSentenceSpacing}
+              wordSpacing={writingWordSpacing}
+            />
           ) : (
             <AtlasSummary
               atlasOrder={atlasOrder}
@@ -1048,6 +1085,137 @@ type AtlasLayout = {
   columns: number
   rows: number
   pageSize: number
+}
+
+type WritingPlacement = {
+  key: string
+  value: string
+  digitsPerGlyph: number
+  path: string
+  transform: string
+}
+
+type WritingRender = {
+  svg: string
+  viewBox: string
+  width: number
+  height: number
+  groups: number
+  glyphs: number
+  placements: WritingPlacement[]
+}
+
+type WritingToolProps = {
+  fill: string
+  glyphSize: number
+  input: string
+  lineSpacing: number
+  render: WritingRender
+  sentenceSpacing: number
+  wordSpacing: number
+  onCopySvg: () => void
+  onExportSvg: () => void
+  onGlyphSizeChange: (value: number) => void
+  onInputChange: (value: string) => void
+  onLineSpacingChange: (value: number) => void
+  onSentenceSpacingChange: (value: number) => void
+  onWordSpacingChange: (value: number) => void
+}
+
+function WritingTool({
+  fill,
+  glyphSize,
+  input,
+  lineSpacing,
+  render,
+  sentenceSpacing,
+  wordSpacing,
+  onCopySvg,
+  onExportSvg,
+  onGlyphSizeChange,
+  onInputChange,
+  onLineSpacingChange,
+  onSentenceSpacingChange,
+  onWordSpacingChange,
+}: WritingToolProps) {
+  return (
+    <div className="writing-tool">
+      <label className="writing-input">
+        <span>Text</span>
+        <textarea value={input} spellCheck={false} onChange={(event) => onInputChange(event.target.value)} />
+      </label>
+
+      <div className="writing-controls">
+        <label>
+          <span>Glyph size</span>
+          <input
+            type="number"
+            min={32}
+            max={220}
+            value={glyphSize}
+            onChange={(event) => onGlyphSizeChange(clampNumber(Number(event.target.value), 32, 220))}
+          />
+        </label>
+        <label>
+          <span>Word gap</span>
+          <input
+            type="number"
+            min={0}
+            max={180}
+            value={wordSpacing}
+            onChange={(event) => onWordSpacingChange(clampNumber(Number(event.target.value), 0, 180))}
+          />
+        </label>
+        <label>
+          <span>Sentence gap</span>
+          <input
+            type="number"
+            min={0}
+            max={240}
+            value={sentenceSpacing}
+            onChange={(event) => onSentenceSpacingChange(clampNumber(Number(event.target.value), 0, 240))}
+          />
+        </label>
+        <label>
+          <span>Line gap</span>
+          <input
+            type="number"
+            min={0}
+            max={240}
+            value={lineSpacing}
+            onChange={(event) => onLineSpacingChange(clampNumber(Number(event.target.value), 0, 240))}
+          />
+        </label>
+      </div>
+
+      <div className="writing-preview">
+        <svg viewBox={render.viewBox} role="img" aria-label="Octal glyph writing preview">
+          {render.placements.map((placement) => (
+            <g key={placement.key} transform={placement.transform}>
+              <path d={placement.path} fill={fill} fillRule="evenodd" />
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      <div className="render-meta">
+        <span>{render.groups} word{render.groups === 1 ? '' : 's'}</span>
+        <span>{render.glyphs} glyph{render.glyphs === 1 ? '' : 's'}</span>
+        <span>{formatCoord(render.width)} x {formatCoord(render.height)}</span>
+      </div>
+
+      <div className="export-actions">
+        <button type="button" onClick={onCopySvg}>
+          <Copy size={16} />
+          Copy SVG
+        </button>
+        <button type="button" onClick={onExportSvg}>
+          <Download size={16} />
+          Export SVG
+        </button>
+      </div>
+    </div>
+  )
 }
 
 type AtlasSummaryProps = {
@@ -1683,6 +1851,183 @@ function ensureCoreHole(font: GlyphFont, thickness: number) {
   return font.core.holes[0]
 }
 
+function buildWritingRender(
+  font: GlyphFont,
+  input: string,
+  glyphSize: number,
+  wordSpacing: number,
+  sentenceSpacing: number,
+  lineSpacing: number,
+): WritingRender {
+  const safeGlyphSize = clampNumber(glyphSize, 32, 220)
+  const safeWordSpacing = clampNumber(wordSpacing, 0, 180)
+  const safeSentenceSpacing = clampNumber(sentenceSpacing, 0, 240)
+  const safeLineSpacing = clampNumber(lineSpacing, 0, 240)
+  const sourceLines = input.replace(/\r\n?/g, '\n').split('\n')
+  const lines = sourceLines.length > 0 ? sourceLines : ['']
+  const lineLayouts = lines.map((line, lineIndex) =>
+    buildWritingLine(font, line, lineIndex, safeGlyphSize, safeWordSpacing, safeSentenceSpacing),
+  )
+  const width = Math.max(1, Math.max(...lineLayouts.map((line) => line.width)))
+  let cursorY = 0
+  const placements: WritingPlacement[] = []
+
+  lineLayouts.forEach((line, lineIndex) => {
+    line.glyphs.forEach((glyph) => {
+      const yOffset = (line.height - glyph.height) / 2
+      const tx = glyph.x - glyph.render.bounds.minX * glyph.scale
+      const ty = cursorY + yOffset - glyph.render.bounds.minY * glyph.scale
+      placements.push({
+        key: `${lineIndex}-${glyph.wordIndex}-${glyph.glyphIndex}-${glyph.value}`,
+        value: glyph.value,
+        digitsPerGlyph: glyph.digitsPerGlyph,
+        path: glyph.render.path,
+        transform: `matrix(${formatPathNumber(glyph.scale)} 0 0 ${formatPathNumber(glyph.scale)} ${formatPathNumber(tx)} ${formatPathNumber(ty)})`,
+      })
+    })
+
+    cursorY += line.height
+    if (lineIndex < lineLayouts.length - 1) {
+      cursorY += safeLineSpacing
+    }
+  })
+
+  const height = Math.max(1, cursorY)
+  const viewBox = `0 0 ${formatPathNumber(width)} ${formatPathNumber(height)}`
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${formatPathNumber(width)}" height="${formatPathNumber(height)}" role="img">`,
+    ...placements.map(
+      (placement) =>
+        `  <g transform="${placement.transform}"><path d="${escapeSvgAttribute(placement.path)}" fill="${escapeSvgAttribute(font.renderer.fill)}" fill-rule="evenodd" /></g>`,
+    ),
+    `</svg>`,
+  ].join('\n')
+
+  return {
+    svg,
+    viewBox,
+    width,
+    height,
+    groups: lineLayouts.reduce((count, line) => count + line.groups, 0),
+    glyphs: placements.length,
+    placements,
+  }
+}
+
+function buildWritingLine(
+  font: GlyphFont,
+  line: string,
+  lineIndex: number,
+  glyphSize: number,
+  wordSpacing: number,
+  sentenceSpacing: number,
+) {
+  const words = line.trim().split(/\s+/).filter(Boolean)
+  const glyphs: Array<{
+    glyphIndex: number
+    digitsPerGlyph: number
+    wordIndex: number
+    height: number
+    render: ReturnType<typeof buildGlyphRender>
+    scale: number
+    value: string
+    width: number
+    x: number
+  }> = []
+  let cursorX = 0
+  let lineHeight = words.length > 0 ? glyphSize : glyphSize * 0.6
+  let wordCount = 0
+
+  words.forEach((word, wordIndex) => {
+    const parsedWord = parseWritingWord(word)
+    if (parsedWord.length === 0) {
+      return
+    }
+
+    wordCount += 1
+    let wordWidth = 0
+    let wordHeight = 0
+    parsedWord.forEach((glyph, glyphIndex) => {
+      const render = buildGlyphRender(font, glyph.value, glyph.digitsPerGlyph)
+      const scale = glyphSize / Math.max(render.bounds.width, render.bounds.height, 1)
+      const width = render.bounds.width * scale
+      const height = render.bounds.height * scale
+      glyphs.push({
+        glyphIndex,
+        digitsPerGlyph: glyph.digitsPerGlyph,
+        wordIndex,
+        height,
+        render,
+        scale,
+        value: glyph.value,
+        width,
+        x: cursorX + wordWidth,
+      })
+      wordWidth += width
+      if (glyphIndex < parsedWord.length - 1) {
+        wordWidth += wordSpacing
+      }
+      wordHeight = Math.max(wordHeight, height)
+    })
+
+    lineHeight = Math.max(lineHeight, wordHeight)
+    cursorX += wordWidth
+    if (wordIndex < words.length - 1) {
+      cursorX += sentenceSpacing
+    }
+  })
+
+  return {
+    glyphs,
+    groups: wordCount,
+    height: lineHeight,
+    lineIndex,
+    width: Math.max(1, cursorX),
+  }
+}
+
+function parseWritingWord(word: string) {
+  const trimmed = word.trim()
+  if (!trimmed) {
+    return []
+  }
+
+  const separator = trimmed.includes('-') ? '-' : isColonWordSeparator(trimmed) ? ':' : null
+  const parts = separator ? trimmed.split(separator) : [trimmed]
+  return parts.map(parseWritingGlyph).filter((glyph): glyph is { value: string; digitsPerGlyph: number } => Boolean(glyph))
+}
+
+function isColonWordSeparator(value: string) {
+  return /^[0-7]+(?::[0-7]+)+$/.test(value) && !/^([0-7]+):[3-8]$/.test(value)
+}
+
+function parseWritingGlyph(token: string) {
+  const match = token.trim().match(/^([0-7]+)(?:[:;]([3-8]))?$/)
+  if (!match) {
+    return null
+  }
+
+  const value = match[1]
+  const digitsPerGlyph = match[2] ? Number(match[2]) : chooseWritingSpecies(value.length)
+  return { value, digitsPerGlyph }
+}
+
+function chooseWritingSpecies(digitCount: number) {
+  return SPECIES_DIGIT_COUNTS.find((digitsPerGlyph) => digitCount <= digitsPerGlyph) ?? 8
+}
+
+function normalizeWritingInput(value: string) {
+  return value.replace(/[0-7]{9,}/g, (match) => splitEvery(match, 8).join(' '))
+}
+
+function splitEvery(value: string, size: number) {
+  const chunks: string[] = []
+  for (let index = 0; index < value.length; index += size) {
+    chunks.push(value.slice(index, index + size))
+  }
+  return chunks
+}
+
 function buildAtlasPage(
   font: GlyphFont,
   digitsPerGlyph: number,
@@ -2038,6 +2383,14 @@ function formatInputNumber(value: number) {
 
 function formatPathNumber(value: number) {
   return Number.parseFloat(value.toFixed(2)).toString()
+}
+
+function escapeSvgAttribute(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
 function formatBigInt(value: bigint) {
